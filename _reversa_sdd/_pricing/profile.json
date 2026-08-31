@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.1",
+  "created_at": "2026-08-09T16:41:35Z",
+  "country": "BR",
+  "currency": "BRL",
+  "seniority": "senior",
+  "hourly_rate": 250,
+  "hourly_rate_mode": "direto",
+  "monthly_target_income": null,
+  "billable_hours_per_month": null,
+  "margin_percent": 50,
+  "tax_regime": "simples_servicos",
+  "tax_factor": 0.15,
+  "tax_factor_kind": "effective_reserve_estimate",
+  "tax_factor_source": "Receita Federal, Simples Nacional, anexos e fator R",
+  "includes_vat": true,
+  "vat_pass_through_warning": true,
+  "tax_regime_confidence": "high",
+  "pricing_models": [
+    "valor_fixo_por_entrega"
+  ],
+  "client_profile": [
+    "microempresa",
+    "pequena_empresa",
+    "media_empresa",
+    "enterprise",
+    "governo",
+    "cliente_internacional"
+  ],
+  "billing_currency": "USD",
+  "exchange_rate_to_local": 6
+}

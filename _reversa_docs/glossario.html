@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Glossário — Reversa Docs</title>
+  <meta name="reversa-category" content="diagram">
+  <meta name="reversa-producer-agent" content="reversa-docs-storyteller">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/nav.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-card: #1e293b;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --color-accent: #6366f1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #fff;
+    }
+    nav.reversa-doc-nav {
+      display: flex;
+      gap: 0.75rem;
+    }
+    nav.reversa-doc-nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 0.4rem 0.8rem;
+      border-radius: 0.375rem;
+      transition: all 0.2s;
+    }
+    nav.reversa-doc-nav a:hover, nav.reversa-doc-nav a[aria-current="page"] {
+      color: #fff;
+      background: var(--color-accent);
+    }
+    .container {
+      padding: 2rem;
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .page-title {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+    .search-box {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 0.5rem;
+      color: #fff;
+      font-size: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .concepts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+    .concept-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+    }
+    .concept-term {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #6366f1;
+      margin-bottom: 0.5rem;
+    }
+    .concept-def {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="32" height="32"><circle cx="32" cy="32" r="28" fill="#1e293b" stroke="#6366f1" stroke-width="3"/><text x="32" y="37" text-anchor="middle" fill="#6366f1" font-family="sans-serif" font-size="14" font-weight="bold">CS</text></svg>
+      <span>ClassSync AI — Glossário de Conceitos</span>
+    </div>
+    <nav class="reversa-doc-nav"><a href="index.html" data-page-id="index">Visão Geral</a><a href="manual-usuario.html" data-page-id="manual-usuario">Manual do Usuário</a><a href="arquitetura.html" data-page-id="arquitetura">Arquitetura 3D</a><a href="modulos.html" data-page-id="modulos">Módulos</a><a href="topologia.html" data-page-id="topologia">Topologia</a><a href="metricas.html" data-page-id="metricas">Métricas</a><a href="glossario.html" data-page-id="glossario">Glossário</a><a href="deck.html" data-page-id="deck">Deck</a></nav>
+  </header>
+
+  <div class="container">
+    <h1 class="page-title">Glossário de Termos do Dominio</h1>
+    <input type="text" class="search-box" id="searchInput" placeholder="Buscar conceito ou termo...">
+
+    <div class="concepts-grid" id="conceptsGrid"></div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const concepts = (window.RV_DATA && window.RV_DATA.glossary && window.RV_DATA.glossary.concepts) || [
+        { term: 'AAC', definition: 'Alocação Inicial considerando capacidade física, acessibilidade e recursos.' },
+        { term: 'ACC + AMR', definition: 'Resolução de Conflitos via leilão cooperativo fechado com sistema de créditos.' },
+        { term: 'BuildingOptimizer', definition: 'Otimizador Energético que consolida turmas para fechar blocos prediais subutilizados.' },
+        { term: 'Restrições Horárias', definition: 'Indisponibilidades cadastradas pelos docentes para evitar choques de horário.' }
+      ];
+
+      const grid = document.getElementById('conceptsGrid');
+      const searchInput = document.getElementById('searchInput');
+
+      function renderConcepts(filtered) {
+        grid.innerHTML = filtered.map(c => `
+          <div class="concept-card">
+            <div class="concept-term">${c.term}</div>
+            <div class="concept-def">${c.definition}</div>
+          </div>
+        `).join('');
+      }
+
+      renderConcepts(concepts);
+
+      searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        const filtered = concepts.filter(c =>
+          c.term.toLowerCase().includes(query) ||
+          c.definition.toLowerCase().includes(query)
+        );
+        renderConcepts(filtered);
+      });
+    });
+  </script>
+</body>
+</html>

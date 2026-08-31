@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Deck Executivo — Reversa Docs</title>
+  <meta name="reversa-category" content="diagram">
+  <meta name="reversa-producer-agent" content="reversa-docs-storyteller">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/nav.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-card: #1e293b;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --color-accent: #6366f1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #fff;
+    }
+    nav.reversa-doc-nav {
+      display: flex;
+      gap: 1rem;
+    }
+    nav.reversa-doc-nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 0.4rem 0.8rem;
+      border-radius: 0.4rem;
+      transition: all 0.2s;
+    }
+    nav.reversa-doc-nav a:hover, nav.reversa-doc-nav a.active {
+      color: #fff;
+      background: var(--color-accent);
+    }
+    .deck-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      position: relative;
+    }
+    .slide {
+      display: none;
+      width: 100%;
+      max-width: 900px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      padding: 3rem;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .slide.active {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.4s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .slide h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(to right, #6366f1, #a855f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 1rem;
+    }
+    .slide h2 { font-size: 2rem; font-weight: 700; margin-bottom: 1rem; color: #fff; }
+    .slide p { color: var(--text-secondary); font-size: 1.1rem; line-height: 1.6; max-width: 700px; }
+    .controls {
+      margin-top: 2rem;
+      display: flex;
+      gap: 1rem;
+    }
+    .btn-slide {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 0.6rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-slide:hover {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="assets/img/seal-mini.svg" alt="Mini Seal" width="32" height="32">
+      <span>ClassSync AI — Deck Executivo</span>
+    </div>
+    <nav class="reversa-doc-nav"></nav>
+  </header>
+
+  <div class="deck-container">
+    <div id="slide0" class="slide active">
+      <img src="assets/img/seal.svg" width="120" height="120" style="margin-bottom: 1.5rem;">
+      <h1>ClassSync AI</h1>
+      <p>Apresentação Executiva do Sistema de Otimização e Distribuição de Salas com Agentes de IA.</p>
+    </div>
+
+    <div id="slide1" class="slide">
+      <h2>O Problema Operacional</h2>
+      <p>A alocação manual de salas em instituições de ensino resulta em desperdício de energia em blocos subutilizados e conflitos de horários de docentes.</p>
+    </div>
+
+    <div id="slide2" class="slide">
+      <h2>A Solução com IA</h2>
+      <p>O ClassSync AI utiliza protocolo de leilão de créditos entre agentes autônomos e regras de consolidação predial para reduzir o consumo de energia e eliminar conflitos.</p>
+    </div>
+
+    <div id="slide3" class="slide">
+      <h2>Módulos e UI Moderna</h2>
+      <p>A nova UI do sistema entrega formulários reativos, importação CSV atômica (tudo-ou-nada) e matriz de restrição docente.</p>
+    </div>
+
+    <div class="controls">
+      <button class="btn-slide" id="prevBtn">← Anterior</button>
+      <span id="slideCounter" style="display:flex; align-items:center; color: var(--text-secondary); font-size: 0.9rem;">Slide 1 / 4</span>
+      <button class="btn-slide" id="nextBtn">Próximo →</button>
+    </div>
+  </div>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    let idx = 0;
+    const counter = document.getElementById("slideCounter");
+
+    function updateSlide() {
+      slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+      counter.textContent = `Slide ${idx + 1} / ${slides.length}`;
+    }
+
+    document.getElementById('prevBtn').onclick = () => {
+      idx = (idx - 1 + slides.length) % slides.length;
+      updateSlide();
+    };
+
+    document.getElementById('nextBtn').onclick = () => {
+      idx = (idx + 1) % slides.length;
+      updateSlide();
+    };
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft') document.getElementById('prevBtn').click();
+      if (e.key === 'ArrowRight') document.getElementById('nextBtn').click();
+    });
+  </script>
+</body>
+</html>

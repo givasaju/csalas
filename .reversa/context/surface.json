@@ -1,0 +1,43 @@
+{
+  "generated_at": "2026-08-07T17:12:35-03:00",
+  "project_root": "c:/csalas",
+  "languages": [
+    { "name": "Python", "extensions": [".py"], "file_count": 14 },
+    { "name": "HTML", "extensions": [".html"], "file_count": 1 },
+    { "name": "CSS", "extensions": [".css"], "file_count": 1 }
+  ],
+  "primary_language": "Python",
+  "frameworks": [
+    { "name": "FastAPI", "version": "0.110.0", "source": "requirements.txt" },
+    { "name": "Uvicorn", "version": "0.15.0", "source": "requirements.txt" },
+    { "name": "Pydantic", "version": "2.0.0", "source": "requirements.txt" }
+  ],
+  "package_manager": "pip",
+  "entry_points": [
+    { "path": "src/main.py", "type": "server_entry" }
+  ],
+  "config_files": [
+    "requirements.txt"
+  ],
+  "ci_cd": [],
+  "docker": {},
+  "database_hints": [
+    { "path": "db/migrations.sql", "type": "ddl_schema" }
+  ],
+  "test_framework": "pytest",
+  "test_file_count": 7,
+  "modules": [
+    "core-allocation-engine",
+    "academic-space-manager",
+    "occupancy-dashboard"
+  ],
+  "total_files": 16,
+  "organization_suggestion": {
+    "granularity": "module",
+    "rationale": "A estrutura do código-fonte está organizada em domínios lógicos claros no backend (engine/) e API/persitência (api/).",
+    "signals": [
+      { "type": "top_level_domain_folders", "evidence": ["src/engine/", "src/api/"] }
+    ],
+    "features": []
+  }
+}

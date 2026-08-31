@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual do Usuário — ClassSync AI</title>
+  <meta name="reversa-category" content="user-guide">
+  <meta name="reversa-producer-agent" content="reversa-docs-storyteller">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/nav.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card-hover: #334155;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --color-accent: #6366f1;
+      --color-accent-light: #818cf8;
+      --color-success: #10b981;
+      --color-warning: #f59e0b;
+      --color-danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.6;
+    }
+    header {
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #fff;
+    }
+    nav.reversa-doc-nav {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    nav.reversa-doc-nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.4rem 0.75rem;
+      border-radius: 0.375rem;
+      transition: all 0.2s ease;
+    }
+    nav.reversa-doc-nav a:hover, nav.reversa-doc-nav a[aria-current="page"] {
+      color: #fff;
+      background: var(--color-accent);
+    }
+    .manual-hero {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(15, 23, 42, 0.8) 100%);
+      border-bottom: 1px solid var(--border-color);
+      padding: 3.5rem 2rem 2.5rem;
+      text-align: center;
+    }
+    .manual-hero h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.02em;
+    }
+    .manual-hero p {
+      font-size: 1.15rem;
+      color: var(--text-secondary);
+      max-width: 750px;
+      margin: 0 auto 2rem;
+    }
+    .search-wrapper {
+      max-width: 600px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .search-input {
+      width: 100%;
+      padding: 1rem 1.25rem 1rem 3rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      color: #fff;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+    }
+    .search-icon {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-secondary);
+      font-size: 1.2rem;
+    }
+    .layout-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 2rem;
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 2.5rem 2rem 4rem;
+      width: 100%;
+    }
+    @media (max-width: 900px) {
+      .layout-grid { grid-template-columns: 1fr; }
+      .toc-sidebar { display: none; }
+    }
+    .toc-sidebar {
+      position: sticky;
+      top: 5rem;
+      height: fit-content;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+    }
+    .toc-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .toc-links {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .toc-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.9rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.375rem;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .toc-links a:hover, .toc-links a.active {
+      color: #fff;
+      background: var(--bg-card-hover);
+    }
+    .content-area {
+      display: flex;
+      flex-direction: column;
+      gap: 3rem;
+    }
+    .manual-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      padding: 2rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+      transition: border-color 0.3s;
+    }
+    .manual-card:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+    .card-header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 2rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+    .badge-purple { background: rgba(99, 102, 241, 0.15); color: var(--color-accent-light); }
+    .badge-green { background: rgba(16, 185, 129, 0.15); color: var(--color-success); }
+    .badge-amber { background: rgba(245, 158, 11, 0.15); color: var(--color-warning); }
+
+    .card-h2 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .card-p {
+      color: var(--text-secondary);
+      font-size: 1rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.7;
+    }
+    .steps-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .step-item {
+      display: flex;
+      gap: 1rem;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      align-items: flex-start;
+    }
+    .step-num {
+      width: 32px;
+      height: 32px;
+      background: var(--color-accent);
+      color: #fff;
+      font-weight: 800;
+      font-size: 0.95rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .step-content h4 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.35rem;
+    }
+    .step-content p {
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+    }
+    .mockup-frame {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      overflow: hidden;
+      margin: 1.5rem 0;
+    }
+    .mockup-header {
+      background: #1e293b;
+      padding: 0.6rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dot-red { background: #ef4444; }
+    .dot-yellow { background: #f59e0b; }
+    .dot-green { background: #10b981; }
+    .mockup-title { font-size: 0.8rem; color: var(--text-secondary); margin-left: 0.5rem; font-weight: 600; }
+    .mockup-body {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .ui-sim-btn {
+      background: var(--color-accent);
+      color: #fff;
+      border: none;
+      padding: 0.65rem 1.25rem;
+      border-radius: 0.5rem;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      width: fit-content;
+    }
+    .ui-sim-card {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      border-radius: 0.5rem;
+      padding: 1rem;
+    }
+    .tip-box {
+      background: rgba(16, 185, 129, 0.1);
+      border-left: 4px solid var(--color-success);
+      padding: 1rem 1.25rem;
+      border-radius: 0 0.5rem 0.5rem 0;
+      margin-top: 1.5rem;
+
+    }
+    .tip-box h5 {
+      color: var(--color-success);
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .tip-box p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    .feature-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    .feature-mini-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .feature-mini-icon {
+      font-size: 2.2rem;
+      margin-bottom: 0.5rem;
+    }
+    .feature-mini-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.35rem;
+    }
+    .feature-mini-desc {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="32" height="32"><circle cx="32" cy="32" r="28" fill="#1e293b" stroke="#6366f1" stroke-width="3"/><text x="32" y="37" text-anchor="middle" fill="#6366f1" font-family="sans-serif" font-size="14" font-weight="bold">CS</text></svg>
+      <span>ClassSync AI — Manual Prático do Usuário</span>
+    </div>
+    <nav class="reversa-doc-nav"><a href="index.html" data-page-id="index">Visão Geral</a><a href="manual-usuario.html" data-page-id="manual-usuario">Manual do Usuário</a><a href="arquitetura.html" data-page-id="arquitetura">Arquitetura 3D</a><a href="modulos.html" data-page-id="modulos">Módulos</a><a href="topologia.html" data-page-id="topologia">Topologia</a><a href="metricas.html" data-page-id="metricas">Métricas</a><a href="glossario.html" data-page-id="glossario">Glossário</a><a href="deck.html" data-page-id="deck">Deck</a></nav>
+  </header>
+
+  <section class="manual-hero">
+    <h1>Guia do Usuário: Gestão Inteligente de Espaços</h1>
+    <p>Aprenda a cadastrar salas, gerenciar professores, realizar alocações automáticas e economizar energia da sua instituição sem complicação técnica.</p>
+
+    <div class="search-wrapper">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="manualSearch" placeholder="O que você deseja aprender hoje? (ex: importar CSV, créditos, fechar bloco)...">
+    </div>
+  </section>
+
+  <div class="layout-grid">
+    <aside class="toc-sidebar">
+      <div class="toc-title">Índice do Manual</div>
+      <nav class="toc-links">
+        <a href="#introducao" class="active"><span>💡</span> Visão Geral</a>
+        <a href="#cadastro-salas"><span>🏛️</span> Cadastrar Salas</a>
+        <a href="#restricoes-docentes"><span>👨‍🏫</span> Restrições de Professores</a>
+        <a href="#alocacao-ia"><span>⚡</span> Executar Alocação de IA</a>
+        <a href="#sistema-creditos"><span>⚖️</span> Leilão e Créditos</a>
+        <a href="#economia-energia"><span>🌱</span> Economia Energética</a>
+        <a href="#dashboard-kpis"><span>📊</span> Dashboard e Relatórios</a>
+      </nav>
+    </aside>
+
+    <main class="content-area">
+
+      <!-- SEÇÃO 1: INTRODUÇÃO -->
+      <section class="manual-card" id="introducao">
+        <span class="card-header-badge badge-purple"><span>💡</span> Introdução Amigável</span>
+        <h2 class="card-h2">Como o ClassSync AI Ajuda Sua Instituição</h2>
+        <p class="card-p">
+          O <strong>ClassSync AI</strong> foi criado para substituir planilhas manuais e evitar conflitos de salas de aula. Ele ajuda coordenadores de curso e diretores de campus a organizarem salas de forma inteligente, garantindo acessibilidade e reduzindo custos operacionais com energia elétrica.
+        </p>
+
+        <div class="feature-grid-3">
+          <div class="feature-mini-card">
+            <div class="feature-mini-icon">🎯</div>
+            <div class="feature-mini-title">Zero Conflitos</div>
+            <div class="feature-mini-desc">Turmas alocadas automaticamente respeitando capacidade e indisponibilidades.</div>
+          </div>
+          <div class="feature-mini-card">
+            <div class="feature-mini-icon">⚖️</div>
+            <div class="feature-mini-title">Justiça na Grade</div>
+            <div class="feature-mini-desc">Sistema transparente de créditos para desempatar pedidos por salas nobres.</div>
+          </div>
+          <div class="feature-mini-card">
+            <div class="feature-mini-icon">🌱</div>
+            <div class="feature-mini-title">Economia de Energia</div>
+            <div class="feature-mini-desc">Consolidação automática para desligar ar-condicionado de prédios vazios.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 2: CADASTRO DE SALAS -->
+      <section class="manual-card" id="cadastro-salas">
+        <span class="card-header-badge badge-purple"><span>🏛️</span> Passo a Passo 1</span>
+        <h2 class="card-h2">Como Cadastrar e Importar Salas de Aula</h2>
+        <p class="card-p">
+          Para que o sistema consiga distribuir os alunos, é preciso informar as salas disponíveis na escola ou universidade. Você pode cadastrar uma a uma ou importar todas de uma vez via planilha.
+        </p>
+
+        <div class="steps-list">
+          <div class="step-item">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <h4>Acesse a aba "Gerenciar Salas"</h4>
+              <p>No menu superior do sistema, clique em <strong>Salas & Inventário</strong>.</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <h4>Cadastro Individual de Sala</h4>
+              <p>Preencha a identificação da sala (ex: <code>Sala 101 - Bloco A</code>), a capacidade máxima de alunos (ex: <code>50</code>), se possui acessibilidade PCD e os recursos instalados (como projetor, ar-condicionado, laboratório).</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <h4>Importação em Lote via Planilha (CSV)</h4>
+              <p>Caso tenha muitas salas, clique em <strong>Importar CSV</strong> e selecione sua planilha. O sistema valida automaticamente se a capacidade de todas as salas é maior que zero antes de salvar.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mockup-frame">
+          <div class="mockup-header">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+            <span class="mockup-title">Interface de Cadastro de Sala (Simulação Visual)</span>
+          </div>
+          <div class="mockup-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+              <div class="ui-sim-card">
+                <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 0.3rem;">Nome da Sala</label>
+                <div style="font-weight: 600; color: #fff;">Auditório 2 - Bloco B</div>
+              </div>
+              <div class="ui-sim-card">
+                <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 0.3rem;">Capacidade</label>
+                <div style="font-weight: 600; color: #10b981;">80 Alunos</div>
+              </div>
+              <div class="ui-sim-card">
+                <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 0.3rem;">Acessível PCD</label>
+                <div style="font-weight: 600; color: #3b82f6;">Sim (Térreo/Rampa)</div>
+              </div>
+            </div>
+            <button class="ui-sim-btn">💾 Salvar Sala no Inventário</button>
+          </div>
+        </div>
+
+        <div class="tip-box">
+          <h5>💡 Dica Útil</h5>
+          <p>Sempre marque a opção "Acessibilidade PCD" para salas localizadas no térreo ou prédios com elevador. A IA dará prioridade automática para turmas com alunos que necessitam dessa facilidade.</p>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 3: RESTRIÇÕES DOCENTES -->
+      <section class="manual-card" id="restricoes-docentes">
+        <span class="card-header-badge badge-amber"><span>👨‍🏫</span> Passo a Passo 2</span>
+        <h2 class="card-h2">Como Cadastrar Indisponibilidades de Professores</h2>
+        <p class="card-p">
+          Alguns professores possuem compromissos acadêmicos ou horários específicos em que não podem ministrar aulas. O sistema garante que nenhuma turma será alocada nesses momentos.
+        </p>
+
+        <div class="steps-list">
+          <div class="step-item">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <h4>Selecione o Professor</h4>
+              <p>Busque o docente pelo nome ou e-mail cadastrado na plataforma.</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <h4>Marque os Dias e Horários de Bloqueio</h4>
+              <p>Clique nos blocos de horário da semana (ex: Segunda-feira pela manhã) para definir a indisponibilidade.</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <h4>Reset Semestral</h4>
+              <p>Ao início de cada novo semestre letivo, utilize a função <strong>Resetar Restrições</strong> para limpar a grade antiga e permitir que os professores informem os novos horários.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 4: EXECUTAR ALOCAÇÃO -->
+      <section class="manual-card" id="alocacao-ia">
+        <span class="card-header-badge badge-green"><span>⚡</span> Passo a Passo 3</span>
+        <h2 class="card-h2">Disparando a Alocação Automática por IA</h2>
+        <p class="card-p">
+          Depois de cadastrar as salas, turmas e professores, você não precisa montar a grade manualmente. A Inteligência Artificial do ClassSync calcula tudo em poucos segundos.
+        </p>
+
+        <div class="steps-list">
+          <div class="step-item">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <h4>Clique em "Disparar Alocação de IA"</h4>
+              <p>No painel principal, clique no botão destacado <strong>Executar Otimização de Salas</strong>.</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <h4>Acompanhe o Progresso em Tempo Real</h4>
+              <p>Uma barra de progresso indicará as fases do cálculo: Alocação Inicial -> Resolução de Disputas -> Otimização Energética.</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <h4>Confirmação e Mapa Visual</h4>
+              <p>Ao finalizar, a tela exibirá o resultado completo com a distribuição final de todas as disciplinas por sala.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mockup-frame">
+          <div class="mockup-header">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+            <span class="mockup-title">Controle de Otimização (Simulação Visual)</span>
+          </div>
+          <div class="mockup-body" style="text-align: center;">
+            <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid var(--color-accent); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+              <div style="font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Status da Alocação: Concluído com Sucesso! (100%)</div>
+              <div style="background: #1e293b; height: 10px; border-radius: 5px; overflow: hidden;">
+                <div style="background: #10b981; width: 100%; height: 100%;"></div>
+              </div>
+            </div>
+            <button class="ui-sim-btn" style="margin: 0 auto;">⚡ Iniciar Nova Alocação</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 5: LEILÃO E CRÉDITOS -->
+      <section class="manual-card" id="sistema-creditos">
+        <span class="card-header-badge badge-purple"><span>⚖️</span> Mecanismo Transparente</span>
+        <h2 class="card-h2">Como Funciona o Leilão Cooperativo e Saldo de Créditos</h2>
+        <p class="card-p">
+          Quando duas coordenações de curso desejam exatamente a mesma sala no mesmo horário (ex: Auditório Principal na Terça à Noite), o sistema utiliza o <strong>Leilão Cooperativo</strong> em vez de decisões arbitrárias.
+        </p>
+
+        <div class="steps-list">
+          <div class="step-item">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <h4>Saldo Inicial de 1.000 Créditos</h4>
+              <p>Cada coordenação de curso inicia o período letivo com 1.000 créditos virtuais para utilizar em disputas de salas disputadas.</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <h4>Lances Fechados</h4>
+              <p>O sistema faz uma arbitragem em que a coordenação que investir mais créditos garante a vaga na sala desejada.</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <h4>Compensação Financeira</h4>
+              <p>A coordenação que perde a disputa <strong>recebe créditos de compensação</strong> pagos pela coordenação vencedora, garantindo que terá mais poder de escolha nas próximas alocações!</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 6: ECONOMIA DE ENERGIA -->
+      <section class="manual-card" id="economia-energia">
+        <span class="card-header-badge badge-green"><span>🌱</span> Sustentabilidade</span>
+        <h2 class="card-h2">Consolidação Predial e Economia Energética</h2>
+        <p class="card-p">
+          Além de organizar as aulas, o ClassSync AI cuida do orçamento da escola ou universidade. Se um bloco de salas estiver com menos de 20% de ocupação em um determinado turno, o sistema move essas poucas turmas para outro prédio mais povoado.
+        </p>
+
+        <div class="feature-grid-3">
+          <div class="feature-mini-card">
+            <div class="feature-mini-icon">🏢</div>
+            <div class="feature-mini-title">Detecção de Bloco Vazio</div>
+            <div class="feature-mini-desc">Identifica prédios com poucas aulas agendadas.</div>
+          </div>
+          <div class="feature-mini-card">
+            <div class="feature-mini-icon">🔄</div>
+            <div class="feature-mini-title">Realocação Inteligente</div>
+            <div class="feature-mini-desc">Transfere as turmas sem gerar conflito com outras disciplinas.</div>
+          </div>
+          <div class="feature-mini-card">
+            <div class="feature-mini-icon">💡</div>
+            <div class="feature-mini-title">Desligamento Físico</div>
+            <div class="feature-mini-desc">Permite desligar luzes, iluminação e ar-condicionado do bloco todo.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 7: DASHBOARD E KPIS -->
+      <section class="manual-card" id="dashboard-kpis">
+        <span class="card-header-badge badge-purple"><span>📊</span> Monitoramento</span>
+        <h2 class="card-h2">Entendendo os Indicadores do Painel de Controle</h2>
+        <p class="card-p">
+          Ao abrir o painel principal, você encontrará 4 cartões de métricas (KPIs) que mostram a saúde do uso dos espaços da instituição:
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: 1.5rem;">
+          <div class="ui-sim-card">
+            <div style="font-size: 0.8rem; color: #94a3b8;">Taxa de Ocupação Geral</div>
+            <div style="font-size: 1.5rem; font-weight: 800; color: #3b82f6;">84.5%</div>
+            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.2rem;">Porcentagem de assentos utilizados.</div>
+          </div>
+
+          <div class="ui-sim-card">
+            <div style="font-size: 0.8rem; color: #94a3b8;">Economia Est. Energia</div>
+            <div style="font-size: 1.5rem; font-weight: 800; color: #10b981;">R$ 18.400</div>
+            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.2rem;">Redução de custos por blocos fechados.</div>
+          </div>
+
+          <div class="ui-sim-card">
+            <div style="font-size: 0.8rem; color: #94a3b8;">Blocos Desativados</div>
+            <div style="font-size: 1.5rem; font-weight: 800; color: #f59e0b;">2 Prédios</div>
+            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.2rem;">Desligados nos turnos de menor movimento.</div>
+          </div>
+
+          <div class="ui-sim-card">
+            <div style="font-size: 0.8rem; color: #94a3b8;">Conflitos Resolvidos</div>
+            <div style="font-size: 1.5rem; font-weight: 800; color: #6366f1;">100%</div>
+            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.2rem;">Sem choque de horário entre turmas.</div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Interactive Live Search inside Manual
+      const searchInput = document.getElementById('manualSearch');
+      const cards = document.querySelectorAll('.manual-card');
+
+      searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        cards.forEach(card => {
+          const text = card.textContent.toLowerCase();
+          if (!query || text.includes(query)) {
+            card.style.display = 'block';
+          } else {
+            card.style.display = 'none';
+          }
+        });
+      });
+
+      // Smooth scroll table of contents
+      const tocLinks = document.querySelectorAll('.toc-links a');
+      tocLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const targetId = link.getAttribute('href');
+          const targetElem = document.querySelector(targetId);
+          if (targetElem) {
+            targetElem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            tocLinks.forEach(l => l.classList.remove('active'));
+            link.classList.add('active');
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

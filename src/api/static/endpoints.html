@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Endpoints da API</title>
+  <style>
+    body {font-family: 'Inter', sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 2rem;}
+    h1 {color: #fff;}
+    ul {list-style: none; padding: 0;}
+    li {margin: 0.5rem 0;}
+    a {color: #4fc3f7; text-decoration: none;}
+    a:hover {text-decoration: underline;}
+    .card {background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.5rem;}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>📡 Endpoints Públicos da API</h1>
+    <ul>
+      <li><a href="/">Home (index.html)</a></li>
+      <li><a href="/index.css">CSS da UI</a></li>
+      <li><a href="/api/v1/rooms">/api/v1/rooms (GET/POST)</a></li>
+      <li><a href="/api/v1/rooms/import-csv">/api/v1/rooms/import-csv (POST)</a></li>
+      <li><a href="/api/v1/allocation/restrictions">/api/v1/allocation/restrictions (POST/DELETE)</a></li>
+      <li><a href="/api/v1/allocation/input-data">/api/v1/allocation/input-data (GET)</a></li>
+      <li><a href="/api/v1/allocation/run">/api/v1/allocation/run (POST)</a></li>
+      <li><a href="/api/v1/allocation/status/{task_id}">/api/v1/allocation/status/{task_id} (GET)</a></li>
+    </ul>
+  </div>
+</body>
+</html>

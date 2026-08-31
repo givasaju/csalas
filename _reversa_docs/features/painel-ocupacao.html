@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feature — Painel de Ocupação</title>
+  <meta name="reversa-category" content="diagram">
+  <meta name="reversa-producer-agent" content="reversa-docs-storyteller">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="../assets/js/data.js"></script>
+  <script src="../assets/js/nav.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-card: #1e293b;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --color-accent: #6366f1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+    header {
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #fff;
+    }
+    nav.reversa-doc-nav {
+      display: flex;
+      gap: 0.75rem;
+    }
+    nav.reversa-doc-nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 0.4rem 0.8rem;
+      border-radius: 0.375rem;
+    }
+    .container {
+      padding: 2rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .feature-title { font-size: 2rem; font-weight: 700; color: #6366f1; margin-bottom: 1rem; }
+    .feature-body { font-size: 1rem; color: var(--text-secondary); line-height: 1.6; }
+    .section { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 0.75rem; padding: 1.5rem; margin-top: 1.5rem; }
+    .section-title { font-size: 1.2rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span>ClassSync AI — Feature: Painel de Ocupação</span>
+    </div>
+    <nav class="reversa-doc-nav"><a href="../index.html" data-page-id="index">Visão Geral</a><a href="../manual-usuario.html" data-page-id="manual-usuario">Manual do Usuário</a><a href="../arquitetura.html" data-page-id="arquitetura">Arquitetura 3D</a><a href="../modulos.html" data-page-id="modulos">Módulos</a><a href="../topologia.html" data-page-id="topologia">Topologia</a><a href="../metricas.html" data-page-id="metricas">Métricas</a><a href="../glossario.html" data-page-id="glossario">Glossário</a><a href="../deck.html" data-page-id="deck">Deck</a></nav>
+  </header>
+
+  <div class="container">
+    <h1 class="feature-title">Occupancy Dashboard</h1>
+    <p class="feature-body">Interface Single Page Application (SPA) para monitoramento em tempo real, KPIs de economia energética e controle de execução da IA.</p>
+
+    <div class="section">
+      <div class="section-title">KPI Cards</div>
+      <p class="feature-body">Exibição de métricas chaves: Taxa de Ocupação Geral, Economia de Energia, Blocos Desativados e Conflitos Resolvidos.</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Extrato de Leilões</div>
+      <p class="feature-body">Auditoria de transações de créditos entre coordenações em tempo real com compensações pagas e recebidas.</p>
+    </div>
+  </div>
+</body>
+</html>

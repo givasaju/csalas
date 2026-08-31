@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.1",
+  "formula_versions": {
+    "effort": "2.0",
+    "value": "2.0",
+    "market": "2.0"
+  },
+  "created_at": "2026-08-09T16:45:00Z",
+  "feature_dir": "_reversa_forward/011-disciplina-alocacao-aula",
+  "profile_ref": "_reversa_sdd/_pricing/profile.json",
+  "size_ref": "_reversa_sdd/_pricing/011-disciplina-alocacao-aula/size.json",
+  "currency": "BRL",
+  "billing_currency": "USD",
+  "exchange_rate_to_local": 6,
+  "scenarios": {
+    "effort": {
+      "available": true,
+      "horas_min": 12,
+      "horas_max": 32,
+      "horas_estimadas": 22,
+      "seniority_factor": 1,
+      "custo_direto_min": 3000,
+      "custo_direto_max": 8000,
+      "custo_direto": 5500,
+      "imposto_aproximado_min": 450,
+      "imposto_aproximado_max": 1200,
+      "imposto_aproximado": 825,
+      "markup_aplicado_min": 1500,
+      "markup_aplicado_max": 4000,
+      "markup_aplicado": 2750,
+      "preco_minimo": 4950,
+      "preco_maximo": 13200,
+      "preco_total": 9075,
+      "explanation_pt_br": "12 a 32h, custo direto R$ 3.000,00 a R$ 8.000,00 + reserva tributaria (15%) R$ 450,00 a R$ 1.200,00 + markup de projeto (50%) R$ 1.500,00 a R$ 4.000,00."
+    },
+    "value": {
+      "available": false,
+      "monthly_return_declared": 0,
+      "users_impacted": 1000,
+      "cost_of_not_doing": 0,
+      "explanation_pt_br": "Cenario Valor nao disponivel: cliente nao declarou retorno mensal nem custo de nao fazer."
+    },
+    "market": {
+      "available": true,
+      "country": "BR",
+      "seniority": "senior",
+      "primary_pricing_model": "valor_fixo_por_entrega",
+      "primary_client_profile": "microempresa",
+      "complexity_class": "M",
+      "market_hourly_min": 100,
+      "market_hourly_max": 200,
+      "source_kind": "salary_derived_freelance_estimate",
+      "source_year": "2025-2026",
+      "sources": [
+        "Portal Salario CAGED",
+        "Glassdoor Brasil"
+      ],
+      "preco_minimo": 1200,
+      "preco_maximo": 6400,
+      "fallback_applied": false,
+      "explanation_pt_br": "Taxa hora de mercado no Brasil para senior: R$ 100,00/h a R$ 200,00/h aplicado sobre 12h a 32h."
+    }
+  },
+  "guidance_pt_br": "Como o cliente nao declarou retorno mensuravel, o Cenario Valor nao esta disponivel. Utilize o Cenario Esforco (R$ 4.950,00 a R$ 13.200,00 BRL) como piso minimo defensavel para garantir a rentabilidade pretendida (com markup de 50% e reserva fiscal)."
+}

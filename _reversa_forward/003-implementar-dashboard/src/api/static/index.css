@@ -1,0 +1,14 @@
+/* Dashboard header styling */
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* Existing styles (if any) */
+/* Add other component styles here */

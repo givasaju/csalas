@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClassSync AI — Mini-site de Engenharia Reversa</title>
+  <meta name="reversa-category" content="index">
+  <meta name="reversa-producer-agent" content="reversa-docs-publisher">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/nav.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-card: #1e293b;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --color-accent: #6366f1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+    header {
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #fff;
+    }
+    nav.reversa-doc-nav {
+      display: flex;
+      gap: 0.75rem;
+    }
+    nav.reversa-doc-nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 0.4rem 0.8rem;
+      border-radius: 0.375rem;
+      transition: all 0.2s;
+    }
+    nav.reversa-doc-nav a:hover, nav.reversa-doc-nav a[aria-current="page"] {
+      color: #fff;
+      background: var(--color-accent);
+    }
+    .hero {
+      padding: 4rem 2rem 3rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .seal-wrapper {
+      width: 140px;
+      height: 140px;
+      margin-bottom: 1.5rem;
+    }
+    .hero-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 0.5rem;
+    }
+    .hero-subtitle {
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin-bottom: 2.5rem;
+    }
+    .container {
+      padding: 0 2rem 4rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .section-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      color: #f8fafc;
+    }
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+    .nav-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      text-decoration: none;
+      color: inherit;
+      transition: transform 0.2s, border-color 0.2s;
+      display: flex;
+      flex-direction: column;
+    }
+    .nav-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--color-accent);
+    }
+    .card-icon {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+    .card-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.5rem;
+    }
+    .card-desc {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="32" height="32"><circle cx="32" cy="32" r="28" fill="#1e293b" stroke="#6366f1" stroke-width="3"/><text x="32" y="37" text-anchor="middle" fill="#6366f1" font-family="sans-serif" font-size="14" font-weight="bold">CS</text></svg>
+      <span>ClassSync AI — Reversa Docs</span>
+    </div>
+    <nav class="reversa-doc-nav"><a href="index.html" data-page-id="index">Visão Geral</a><a href="manual-usuario.html" data-page-id="manual-usuario">Manual do Usuário</a><a href="arquitetura.html" data-page-id="arquitetura">Arquitetura 3D</a><a href="modulos.html" data-page-id="modulos">Módulos</a><a href="topologia.html" data-page-id="topologia">Topologia</a><a href="metricas.html" data-page-id="metricas">Métricas</a><a href="glossario.html" data-page-id="glossario">Glossário</a><a href="deck.html" data-page-id="deck">Deck</a></nav>
+  </header>
+
+  <div class="hero">
+    <div class="seal-wrapper">
+      <img src="assets/img/seal.svg" alt="Selo do Projeto" width="140" height="140">
+    </div>
+    <h1 class="hero-title">ClassSync AI</h1>
+    <p class="hero-subtitle">Motor Inteligente de Otimização e Distribuição de Salas de Aula Físicas via IA e Leilão Cooperativo Multiagente.</p>
+  </div>
+
+  <div class="container">
+    <h2 class="section-title">Documentação Interativa do Sistema</h2>
+
+    <div class="cards-grid">
+      <a href="arquitetura.html" class="nav-card">
+        <div class="card-icon">🧊</div>
+        <div class="card-title">Arquitetura 3D (Code City)</div>
+        <div class="card-desc">Navegue tridimensionalmente pelos blocos de código e componentes do sistema.</div>
+      </a>
+
+      <a href="modulos.html" class="nav-card">
+        <div class="card-icon">🕸️</div>
+        <div class="card-title">Mapa de Módulos (2D D3)</div>
+        <div class="card-desc">Explore o acoplamento e as dependências entre os módulos de software em um grafo interativo.</div>
+      </a>
+
+      <a href="topologia.html" class="nav-card">
+        <div class="card-icon">🏗️</div>
+        <div class="card-title">Topologia de Subsistemas</div>
+        <div class="card-desc">Visão detalhada dos componentes: core-allocation-engine, academic-space-manager e occupancy-dashboard.</div>
+      </a>
+
+      <a href="metricas.html" class="nav-card">
+        <div class="card-icon">📊</div>
+        <div class="card-title">Dashboard de Métricas</div>
+        <div class="card-desc">Análise quantitativa de LOC, complexidade ciclomática e distribuição de código em Highcharts.</div>
+      </a>
+
+      <a href="glossario.html" class="nav-card">
+        <div class="card-icon">📖</div>
+        <div class="card-title">Glossário de Termos</div>
+        <div class="card-desc">Definição rápida de termos e algoritmos chave como AAC, ACC + AMR e BuildingOptimizer com busca.</div>
+      </a>
+
+      <a href="deck.html" class="nav-card">
+        <div class="card-icon">🖥️</div>
+        <div class="card-title">Apresentação Deck</div>
+        <div class="card-desc">Slide deck navegável com resumo executivo para onboarding de novos desenvolvedores e stakeholders.</div>
+      </a>
+    </div>
+
+    <h2 class="section-title">Features Detalhadas (SDD Specs)</h2>
+
+    <div class="cards-grid">
+      <a href="features/motor-alocacao.html" class="nav-card">
+        <div class="card-icon">⚙️</div>
+        <div class="card-title">Motor de Alocação</div>
+        <div class="card-desc">Algoritmo guloso, leilão cooperativo de créditos e otimização energética de blocos.</div>
+      </a>
+
+      <a href="features/gerenciador-espacos.html" class="nav-card">
+        <div class="card-icon">🏛️</div>
+        <div class="card-title">Gerenciador de Espaços</div>
+        <div class="card-desc">Cadastro de salas, importação CSV e restrições horárias docentes.</div>
+      </a>
+
+      <a href="features/painel-ocupacao.html" class="nav-card">
+        <div class="card-icon">🖥️</div>
+        <div class="card-title">Painel de Ocupação</div>
+        <div class="card-desc">Dashboard SPA de monitoramento, extrato de leilões e KPIs operacionais.</div>
+      </a>
+    </div>
+  </div>
+</body>
+</html>

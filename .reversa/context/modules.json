@@ -1,0 +1,365 @@
+{
+  "generated_at": "2026-08-07T17:55:00Z",
+  "modules": [
+    {
+      "name": "core-allocation-engine",
+      "path": "src/engine",
+      "purpose": "Orquestrador principal de alocação de salas físicas, mediação de conflitos via leilão multiagente cooperativo e otimização de consolidação predial para economia de energia.",
+      "primary_files": [
+        "src/engine/core.py",
+        "src/engine/agents.py",
+        "src/engine/optimization.py"
+      ],
+      "functions": [
+        {
+          "name": "CoreAllocationEngine.__init__",
+          "file": "src/engine/core.py",
+          "params": ["rooms: List[Dict[str, Any]]", "coordinations: List[Dict[str, Any]]", "classes: List[Dict[str, Any]]"],
+          "returns": "None",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "CoreAllocationEngine.run_allocation",
+          "file": "src/engine/core.py",
+          "params": [],
+          "returns": "Tuple[Dict[str, Dict[str, Any]], List[str], List[Dict[str, Any]]]",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "ACC.make_bid",
+          "file": "src/engine/agents.py",
+          "params": ["class_id: str", "room_id: str", "urgency: int"],
+          "returns": "int",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "AMR.resolve_dispute",
+          "file": "src/engine/agents.py",
+          "params": ["room_id: str", "time_slot: str", "competitor_bids: Dict[ACC, int]"],
+          "returns": "ACC",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "BuildingOptimizer.optimize_building_occupancy",
+          "file": "src/engine/optimization.py",
+          "params": ["allocations: Dict[str, Dict[str, Any]]", "rooms: List[Dict[str, Any]]", "blocks: List[str]"],
+          "returns": "Tuple[Dict[str, Dict[str, Any]], List[str]]",
+          "confidence": "confirmed"
+        }
+      ],
+      "entities": [
+        {
+          "name": "Allocation",
+          "fields": [
+            { "name": "room_id", "type": "string | None", "required": true },
+            { "name": "time_slot", "type": "string", "required": true },
+            { "name": "students_count", "type": "int", "required": true },
+            { "name": "coordination_id", "type": "string", "required": true },
+            { "name": "urgency", "type": "int", "required": true },
+            { "name": "status", "type": "string", "required": false }
+          ],
+          "confidence": "confirmed"
+        },
+        {
+          "name": "ACC",
+          "fields": [
+            { "name": "id_coord", "type": "string", "required": true },
+            { "name": "name", "type": "string", "required": true },
+            { "name": "credits", "type": "int", "required": true }
+          ],
+          "confidence": "confirmed"
+        },
+        {
+          "name": "AuctionBid",
+          "fields": [
+            { "name": "room_id", "type": "string", "required": true },
+            { "name": "time_slot", "type": "string", "required": true },
+            { "name": "winner_id", "type": "string", "required": true },
+            { "name": "loser_id", "type": "string", "required": true },
+            { "name": "credits_spent", "type": "int", "required": true }
+          ],
+          "confidence": "confirmed"
+        }
+      ],
+      "business_rules": [
+        {
+          "description": "Selecão da sala física na alocação inicial baseia-se na ordenação por capacidade para escolher a sala mais justa para o tamanho da turma.",
+          "location": "src/engine/core.py:66-68",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Lance máximo de créditos por disputa horária é limitado a 20% do saldo atual da coordenação, ponderado pela urgência acadêmica da turma (escala 1 a 5).",
+          "location": "src/engine/agents.py:22-27",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "O leilão é cooperativo: os créditos gastos pelo vencedor são distribuídos como compensação para as coordenações perdedoras.",
+          "location": "src/engine/agents.py:65-72",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Em caso de empate nos lances do leilão horária, vence quem possuir o maior saldo total de créditos no momento.",
+          "location": "src/engine/agents.py:58-63",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "A mediação de conflitos tem um limite rígido de 5 rodadas para evitar loops infinitos.",
+          "location": "src/engine/core.py:83",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Turmas não alocadas por falta de sala alternativa no leilão ficam sob status 'pending_arbitration' e sala 'None'.",
+          "location": "src/engine/core.py:143-144",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Um bloco predial é considerado subutilizado se sua taxa de ocupação esperada for menor que 20% dos slots totais do bloco (quantidade de salas * 6 turnos).",
+          "location": "src/engine/optimization.py:44-52",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "A realocação de turmas de blocos subutilizados não deve migrá-las para outro bloco também considerado subutilizado.",
+          "location": "src/engine/optimization.py:87-88",
+          "confidence": "confirmed"
+        }
+      ],
+      "dependencies": [],
+      "algorithms": [
+        {
+          "name": "Leilão Multiagente Cooperativo",
+          "description": "Arbitragem de colisões de turmas no mesmo horário e sala física usando créditos que são repassados do vencedor para os perdedores."
+        },
+        {
+          "name": "Consolidação e Otimização Energética Predial",
+          "description": "Algoritmo guloso de realocação de turmas de blocos subutilizados (<20% ocupação) para blocos ativos com capacidade e recursos compatíveis."
+        }
+      ],
+      "complexity": "high"
+    },
+    {
+      "name": "academic-space-manager",
+      "path": "src/api",
+      "purpose": "Gerenciamento de inventário físico de salas de aula, importação de dados em lote via CSV, cadastro de indisponibilidades docentes e provisionamento de dados consolidados.",
+      "primary_files": [
+        "src/api/routes.py",
+        "src/api/schemas.py",
+        "src/api/worker.py",
+        "db/migrations.sql"
+      ],
+      "functions": [
+        {
+          "name": "create_room",
+          "file": "src/api/routes.py",
+          "params": ["room: RoomCreate", "authorization: str"],
+          "returns": "Dict[str, Any]",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "import_rooms_csv",
+          "file": "src/api/routes.py",
+          "params": ["file: UploadFile", "authorization: str"],
+          "returns": "Dict[str, Any]",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "create_restriction",
+          "file": "src/api/routes.py",
+          "params": ["restriction: RestrictionCreate", "authorization: str"],
+          "returns": "Dict[str, Any]",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "reset_restrictions",
+          "file": "src/api/routes.py",
+          "params": ["authorization: str"],
+          "returns": "Dict[str, Any]",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "get_input_data",
+          "file": "src/api/routes.py",
+          "params": ["authorization: str"],
+          "returns": "Dict[str, Any]",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "delete_room",
+          "file": "src/api/routes.py",
+          "params": ["room_id: str", "authorization: str"],
+          "returns": "Dict[str, Any]",
+          "confidence": "confirmed"
+        }
+      ],
+      "entities": [
+        {
+          "name": "RoomCreate",
+          "fields": [
+            { "name": "block_id", "type": "string", "required": true },
+            { "name": "name", "type": "string", "required": true },
+            { "name": "capacity", "type": "int", "required": true },
+            { "name": "room_type", "type": "string", "required": true },
+            { "name": "is_accessible", "type": "bool", "required": false },
+            { "name": "features", "type": "List[string]", "required": false }
+          ],
+          "confidence": "confirmed"
+        },
+        {
+          "name": "RestrictionCreate",
+          "fields": [
+            { "name": "teacher_id", "type": "string", "required": true },
+            { "name": "day_of_week", "type": "int", "required": true },
+            { "name": "time_slot_id", "type": "string", "required": true }
+          ],
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Room",
+          "fields": [
+            { "name": "id", "type": "string (UUID)", "required": true },
+            { "name": "block_id", "type": "string", "required": true },
+            { "name": "name", "type": "string", "required": true },
+            { "name": "capacity", "type": "int", "required": true },
+            { "name": "room_type", "type": "string", "required": true },
+            { "name": "is_accessible", "type": "bool", "required": true },
+            { "name": "features", "type": "List[string]", "required": true }
+          ],
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Teacher",
+          "fields": [
+            { "name": "id", "type": "string", "required": true },
+            { "name": "name", "type": "string", "required": true },
+            { "name": "email", "type": "string", "required": true }
+          ],
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Restriction",
+          "fields": [
+            { "name": "id", "type": "string (UUID)", "required": true },
+            { "name": "teacher_id", "type": "string", "required": true },
+            { "name": "day_of_week", "type": "int", "required": true },
+            { "name": "time_slot_id", "type": "string", "required": true }
+          ],
+          "confidence": "confirmed"
+        }
+      ],
+      "business_rules": [
+        {
+          "description": "Não é permitido cadastrar mais de uma sala física com o mesmo nome no mesmo bloco predial.",
+          "location": "src/api/routes.py:38-40",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Importação de salas por arquivo CSV utiliza política transacional de 'Tudo ou Nada'. Qualquer erro sintático ou de validação em qualquer linha invalida o lote inteiro.",
+          "location": "src/api/routes.py:85-122",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Tipos válidos de sala física suportados na criação e importação: common, lab, auditorium.",
+          "location": "src/api/routes.py:108-109",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Cadastros de indisponibilidade docente exigem que o professor já esteja previamente cadastrado no banco.",
+          "location": "src/api/routes.py:148-150",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Slots válidos para indisponibilidade docente: M1, M2, T1, T2, N1, N2. O dia da semana deve ser de 1 (Segunda) a 7 (Domingo).",
+          "location": "src/api/routes.py:153-154",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Não é permitido excluir uma sala física se houver alguma rodada de alocação ativa ( queued ou running ) pendente em background.",
+          "location": "src/api/routes.py:224-231",
+          "confidence": "confirmed"
+        }
+      ],
+      "dependencies": [
+        "core-allocation-engine"
+      ],
+      "algorithms": [
+        {
+          "name": "Validação Transacional de CSV",
+          "description": "Leitura e validação preventiva de todas as linhas de um arquivo CSV de salas de aula antes de estender a coleção em memória (Tudo ou Nada)."
+        }
+      ],
+      "complexity": "medium"
+    },
+    {
+      "name": "occupancy-dashboard",
+      "path": "src/api/static",
+      "purpose": "Interface web visual responsiva para acompanhamento em tempo real do processamento de alocação de salas, exibição de extrato de auditoria de leilões, indicadores de eficiência energética e controle de disparo assíncrono.",
+      "primary_files": [
+        "src/api/static/index.html",
+        "src/api/static/index.css"
+      ],
+      "functions": [
+        {
+          "name": "triggerAllocation",
+          "file": "src/api/static/index.html",
+          "params": [],
+          "returns": "None",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "pollTaskStatus",
+          "file": "src/api/static/index.html",
+          "params": ["taskId"],
+          "returns": "None",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "updateTaskStatus",
+          "file": "src/api/static/index.html",
+          "params": ["status", "progress", "message"],
+          "returns": "None",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "loadInputData",
+          "file": "src/api/static/index.html",
+          "params": [],
+          "returns": "None",
+          "confidence": "confirmed"
+        }
+      ],
+      "entities": [
+        {
+          "name": "KPIs",
+          "fields": [
+            { "name": "kpiOccupancy", "type": "string", "required": true },
+            { "name": "kpiEnergy", "type": "string", "required": true },
+            { "name": "kpiBlocks", "type": "string", "required": true },
+            { "name": "kpiConflicts", "type": "string", "required": true }
+          ],
+          "confidence": "confirmed"
+        }
+      ],
+      "business_rules": [
+        {
+          "description": "Utiliza autenticação simulada fixada em código (Bearer mock-token) para todas as requisições API.",
+          "location": "src/api/static/index.html:95",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "Atualização dos dados visuais de KPIs de eficiência energética e leilões de créditos utiliza valores mockados pré-definidos caso haja dados carregados.",
+          "location": "src/api/static/index.html:174-210",
+          "confidence": "confirmed"
+        },
+        {
+          "description": "A barra de progresso e o polling de status são ativados a cada 1000ms após um disparo bem sucedido.",
+          "location": "src/api/static/index.html:124",
+          "confidence": "confirmed"
+        }
+      ],
+      "dependencies": [
+        "academic-space-manager"
+      ],
+      "algorithms": [],
+      "complexity": "low"
+    }
+  ]
+}

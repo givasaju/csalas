@@ -1,0 +1,10 @@
+{
+  "schema-version": 1,
+  "feature-dir": "_reversa_forward/020-landing-page-login-rbac",
+  "feature-id": "020",
+  "short-name": "landing-page-login-rbac",
+  "started-at": "2026-08-26T18:13:30-03:00",
+  "current-stage": "requirements",
+  "stages-completed": [],
+  "paused-features": []
+}
