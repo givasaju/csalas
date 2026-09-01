@@ -1,5 +1,5 @@
 {
-  "version": "1.2.58",
+  "version": "1.2.60",
   "project": "balcao",
   "user_name": "givas",
   "chat_language": "pt-br",
@@ -322,7 +322,10 @@
     ".reversa\\config.user.toml",
     ".reversa\\plan.md",
     ".reversa\\version",
-    ".reversa\\_config\\manifest.yaml"
+    ".reversa\\_config\\manifest.yaml",
+    ".reversa\\reversa-config.json",
+    ".reversa\\hooks\\check-legacy-policy.mjs",
+    ".reversa\\hooks\\README.md"
   ],
   "newproject_progress": {
     "mode": "guiado",

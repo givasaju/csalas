@@ -1,0 +1,46 @@
+# Byte-compiled / otimização do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambientes virtuais
+.venv/
+venv/
+ENV/
+env/
+
+# Testes e cobertura de código
+.pytest_cache/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Variáveis de ambiente e segredos
+.env
+.env.*
+!.env.example
+
+# Bancos de dados locais / runtime
+db/*.db
+*.sqlite
+*.sqlite3
+
+# Arquivos de IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.antigravity/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Logs
+*.log
+logs/
