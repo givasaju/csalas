@@ -253,7 +253,9 @@
       <button id="tabBtnTeachers" class="tab-btn" onclick="switchTab('teachers-tab')">👨‍🏫 Gestão de Docentes</button>
       <button id="tabBtnAiManagement" class="tab-btn" onclick="switchTab('ai-management-tab')">🤖 Gestão com IA</button>
       <button id="tabBtnReports" class="tab-btn" onclick="switchTab('reports-tab')">📊 Relatórios</button>
+      <button id="tabBtnPlatformTenants" class="tab-btn" style="display: none;" onclick="switchTab('platform-tenants-tab')">🌐 Administração Geral</button>
     </nav>
+
 
 
     <!-- ABA 1: Dashboard e KPIs -->
@@ -1277,7 +1279,249 @@
         </div>
       </div>
     </div>
+
+    <!-- ABA: Administração Geral (Exclusiva para doctor-chef) -->
+    <div id="platform-tenants-tab" class="tab-content">
+      <!-- Card Cabeçalho -->
+      <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(245, 158, 11, 0.3); margin-bottom: 1.5rem; padding: 1.5rem; border-radius: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.85rem;">
+            <div style="font-size: 2rem; background: rgba(245, 158, 11, 0.15); padding: 0.5rem 0.75rem; border-radius: 10px; border: 1px solid rgba(245, 158, 11, 0.3);">🌐</div>
+            <div>
+              <h2 style="font-size: 1.35rem; font-weight: 700; margin: 0; color: #fcd34d;">Administração Geral da Plataforma</h2>
+              <span style="font-size: 0.85rem; color: var(--text-secondary);">Provisionamento e governança de instâncias isoladas (Single-Tenant Multi-Container)</span>
+            </div>
+          </div>
+          <button class="btn-primary" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #000; font-weight: 700; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.25rem; border-radius: 8px; cursor: pointer;" onclick="toggleNewTenantForm()">
+            <span>✨</span> Nova Instituição
+          </button>
+        </div>
+
+        <!-- KPIs da Plataforma -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1.5rem;">
+          <div class="hero-stat-card" style="padding: 1rem; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;">
+            <div id="kpiTotalTenants" class="hero-stat-number" style="font-size: 1.8rem; color: #fcd34d;">0</div>
+            <div class="hero-stat-label">Instituições Ativas</div>
+          </div>
+          <div class="hero-stat-card" style="padding: 1rem; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;">
+            <div id="kpiNextPort" class="hero-stat-number" style="font-size: 1.8rem; color: #34d399;">8001</div>
+            <div class="hero-stat-label">Próxima Porta TCP Livre</div>
+          </div>
+          <div class="hero-stat-card" style="padding: 1rem; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;">
+            <div class="hero-stat-number" style="font-size: 1.8rem; color: #38bdf8;">100%</div>
+            <div class="hero-stat-label">Isolamento Físico de Dados</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Formulário de Provisionamento (Colapsável) -->
+      <div id="newTenantFormCard" class="card" style="display: none; background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+          <h3 style="font-size: 1.1rem; color: #fcd34d; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span>🚀</span> Provisionar Nova Instituição Cliente
+          </h3>
+          <button type="button" class="btn-quick-action" onclick="toggleNewTenantForm()">✕ Fechar</button>
+        </div>
+
+        <form id="formCreateTenant" onsubmit="handleCreateTenant(event)">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem;">
+            <div class="form-group">
+              <label for="tenantNameInput">Nome da Instituição *</label>
+              <input type="text" id="tenantNameInput" class="form-control" placeholder="Ex: Faculdade Inovação" required minlength="3" maxlength="100" oninput="autoGenerateSlug(this.value)">
+            </div>
+            <div class="form-group">
+              <label for="tenantSlugInput">Identificador Único (Slug) *</label>
+              <input type="text" id="tenantSlugInput" class="form-control" placeholder="Ex: faculdade_inovacao" required pattern="^[a-z0-9_]{3,40}$" title="Apenas letras minúsculas, números e sublinhado (3 a 40 caracteres)">
+            </div>
+            <div class="form-group">
+              <label for="tenantPortInput">Porta TCP Dedicada * <span style="font-size: 0.75rem; color: #94a3b8;">(Sugerida automaticamente)</span></label>
+              <input type="number" id="tenantPortInput" class="form-control" min="1024" max="65535" required>
+            </div>
+            <div class="form-group">
+              <label for="tenantMasterEmailInput">E-mail do Gestor Geral (Master-Chef) *</label>
+              <input type="email" id="tenantMasterEmailInput" class="form-control" placeholder="Ex: diretor@inovacao.edu.br" required>
+            </div>
+            <div class="form-group">
+              <label for="tenantMasterPasswordInput">Senha Provisória do Master-Chef *</label>
+              <input type="text" id="tenantMasterPasswordInput" class="form-control" placeholder="Mínimo 8 caracteres (Ex: Inovacao@2026)" required minlength="8">
+            </div>
+          </div>
+
+          <div id="tenantProvisionAlert" class="auth-alert" style="display: none; margin-top: 1rem;"></div>
+
+          <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <button type="button" class="btn-landing-outline" onclick="toggleNewTenantForm()">Cancelar</button>
+            <button type="submit" id="btnSubmitTenant" class="btn-primary" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #000; font-weight: 700; padding: 0.6rem 1.25rem; border-radius: 8px; cursor: pointer;">
+              ⚡ Iniciar Provisionamento
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Tabela de Instituições Cadastradas -->
+      <div class="card" style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <h3 style="font-size: 1.1rem; color: var(--text-primary); margin: 0;">Instituições Cadastradas no Ecossistema</h3>
+            <span style="font-size: 0.8rem; color: var(--text-secondary);">Cada instância possui banco SQLite e container dedicados, sem compartilhamento de dados ou chaves JWT.</span>
+          </div>
+          <button class="btn-quick-action" onclick="loadPlatformTenants()">🔄 Atualizar Lista</button>
+        </div>
+
+        <div class="table-container" style="overflow-x: auto;">
+          <table class="auctions-table">
+            <thead>
+              <tr>
+                <th>Instituição</th>
+                <th>Slug</th>
+                <th>Porta TCP</th>
+                <th>Status</th>
+                <th>URL Dedicada</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="platformTenantsTableBody">
+              <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">Carregando instituições cadastradas...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <!-- Modal de Redefinição Obrigatória de Senha (LGPD Handover) -->
+  <div id="forceChangePasswordModal" class="auth-modal" style="display: none; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 10000; position: fixed; inset: 0; align-items: center; justify-content: center;">
+    <div class="auth-modal-content" style="max-width: 440px; border: 1px solid rgba(245, 158, 11, 0.4); box-shadow: 0 20px 40px rgba(0,0,0,0.6); background: #0f172a; padding: 2rem; border-radius: 12px;">
+      <div style="text-align: center; margin-bottom: 1.25rem;">
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔒</div>
+        <h3 style="font-size: 1.25rem; color: #fcd34d; margin: 0 0 0.4rem 0;">Redefinição Obrigatória de Senha</h3>
+        <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+          Para cumprimento da <strong>LGPD</strong> e privacidade institucional, substitua a senha provisória por uma nova senha pessoal definitiva.
+        </p>
+      </div>
+
+      <div id="changePasswordAlert" class="auth-alert" style="display: none; margin-bottom: 1rem;"></div>
+
+      <form id="formForceChangePassword" onsubmit="handleForceChangePassword(event)">
+        <div class="form-group" style="margin-bottom: 0.85rem;">
+          <label for="pwdCurrent">Senha Provisória Atual *</label>
+          <input type="password" id="pwdCurrent" class="form-control" required placeholder="Digite a senha provisória">
+        </div>
+        <div class="form-group" style="margin-bottom: 0.85rem;">
+          <label for="pwdNew">Nova Senha Privativa * (mínimo 8 caracteres)</label>
+          <input type="password" id="pwdNew" class="form-control" required minlength="8" placeholder="Digite a nova senha">
+        </div>
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label for="pwdConfirm">Confirmação da Nova Senha *</label>
+          <input type="password" id="pwdConfirm" class="form-control" required minlength="8" placeholder="Repita a nova senha">
+        </div>
+
+        <button type="submit" id="btnChangePasswordSubmit" class="btn-primary" style="width: 100%; padding: 0.75rem; background: linear-gradient(135deg, #10b981, #059669); border: none; font-weight: 700; cursor: pointer; border-radius: 8px;">
+          ✨ Salvar Senha e Liberar Acesso
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal de Edição de Instituição Cliente -->
+  <div id="editTenantModal" class="auth-modal" style="display: none; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 10000; position: fixed; inset: 0; align-items: center; justify-content: center;">
+    <div class="auth-modal-content" style="max-width: 520px; width: 90%; border: 1px solid rgba(59, 130, 246, 0.4); box-shadow: 0 20px 40px rgba(0,0,0,0.6); background: #0f172a; padding: 2rem; border-radius: 12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <h3 style="font-size: 1.2rem; color: #93c5fd; margin: 0;">✏️ Editar Instituição Cliente</h3>
+        <button type="button" onclick="closeEditTenantModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;">&times;</button>
+      </div>
+      <div id="editTenantAlert" class="auth-alert" style="display: none; margin-bottom: 1rem;"></div>
+      <form id="formEditTenant" onsubmit="submitEditTenant(event)">
+        <input type="hidden" id="editTenantSlugHidden">
+        <div class="form-group" style="margin-bottom: 0.85rem;">
+          <label for="editTenantSlugDisplay">Identificador (Slug) - Imutável</label>
+          <input type="text" id="editTenantSlugDisplay" class="form-control" disabled style="background: rgba(255,255,255,0.05); color: #94a3b8; font-family: monospace;">
+        </div>
+        <div class="form-group" style="margin-bottom: 0.85rem;">
+          <label for="editTenantPortDisplay">Porta TCP Alocada - Imutável</label>
+          <input type="text" id="editTenantPortDisplay" class="form-control" disabled style="background: rgba(255,255,255,0.05); color: #94a3b8; font-family: monospace;">
+        </div>
+        <div class="form-group" style="margin-bottom: 0.85rem;">
+          <label for="editTenantNameInput">Nome da Instituição *</label>
+          <input type="text" id="editTenantNameInput" class="form-control" required placeholder="Ex: Centro Universitário Inovação">
+        </div>
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label for="editTenantMasterEmailInput">E-mail do Master-Chef (Gestor Geral)</label>
+          <input type="email" id="editTenantMasterEmailInput" class="form-control" placeholder="Ex: diretor@inovacao.edu.br">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn-landing-outline" onclick="closeEditTenantModal()">Cancelar</button>
+          <button type="submit" id="btnSaveEditTenant" class="btn-primary" style="background: #2563eb; color: #fff; font-weight: 600; padding: 0.6rem 1.25rem; border-radius: 8px; border: none; cursor: pointer;">Salvar Alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal de Redefinição de Master-Chef -->
+  <div id="resetMasterChefModal" class="auth-modal" style="display: none; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 10000; position: fixed; inset: 0; align-items: center; justify-content: center;">
+    <div class="auth-modal-content" style="max-width: 500px; width: 90%; border: 1px solid rgba(245, 158, 11, 0.4); box-shadow: 0 20px 40px rgba(0,0,0,0.6); background: #0f172a; padding: 2rem; border-radius: 12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="font-size: 1.2rem; color: #fcd34d; margin: 0;">🔑 Redefinir Credencial do Master-Chef</h3>
+        <button type="button" onclick="closeResetMasterChefModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;">&times;</button>
+      </div>
+      <p style="font-size: 0.82rem; color: #cbd5e1; margin-bottom: 1rem; line-height: 1.4;">
+        A redefinição atualiza a senha na base isolada da instituição e ativa a obrigatoriedade de substituição de senha no primeiro login (conformidade com a LGPD).
+      </p>
+      <div id="resetMasterChefAlert" class="auth-alert" style="display: none; margin-bottom: 1rem;"></div>
+      <form id="formResetMasterChef" onsubmit="submitResetMasterChef(event)">
+        <input type="hidden" id="resetMasterChefSlugHidden">
+        <div class="form-group" style="margin-bottom: 0.85rem;">
+          <label for="resetMasterChefEmailInput">E-mail do Gestor</label>
+          <input type="email" id="resetMasterChefEmailInput" class="form-control" placeholder="E-mail do Master-Chef">
+        </div>
+        <div class="form-group" style="margin-bottom: 0.85rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+            <label for="resetMasterChefPasswordInput" style="margin: 0;">Nova Senha Provisória *</label>
+            <button type="button" onclick="generateRandomPassword()" style="background: none; border: none; color: #f59e0b; cursor: pointer; font-size: 0.8rem; text-decoration: underline;">🎲 Gerar Aleatória</button>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="resetMasterChefPasswordInput" class="form-control" required placeholder="Digite ou gere uma senha" style="font-family: monospace;">
+            <button type="button" onclick="copyResetPassword()" class="btn-quick-action" style="padding: 0.5rem 0.75rem;" title="Copiar para área de transferência">📋 Copiar</button>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.25rem;">
+          <button type="button" class="btn-landing-outline" onclick="closeResetMasterChefModal()">Cancelar</button>
+          <button type="submit" id="btnSubmitResetMasterChef" class="btn-primary" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #000; font-weight: 700; padding: 0.6rem 1.25rem; border-radius: 8px; cursor: pointer;">⚡ Aplicar Redefinição</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal de Exclusão Assistida (Soft Delete) -->
+  <div id="deleteTenantModal" class="auth-modal" style="display: none; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 10000; position: fixed; inset: 0; align-items: center; justify-content: center;">
+    <div class="auth-modal-content" style="max-width: 480px; width: 90%; border: 1px solid rgba(239, 68, 68, 0.4); box-shadow: 0 20px 40px rgba(0,0,0,0.6); background: #0f172a; padding: 2rem; border-radius: 12px;">
+      <div style="text-align: center; margin-bottom: 1.25rem;">
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⚠️</div>
+        <h3 style="font-size: 1.25rem; color: #f87171; margin: 0 0 0.4rem 0;">Excluir e Arquivar Instituição</h3>
+        <p style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.4; margin: 0;">
+          O container será encerrado, a porta TCP liberada e a pasta de dados movida com segurança para <code>./data/.archived/</code> (Soft Delete com retenção para auditoria).
+        </p>
+      </div>
+      <div id="deleteTenantAlert" class="auth-alert" style="display: none; margin-bottom: 1rem;"></div>
+      <input type="hidden" id="deleteTenantSlugHidden">
+      <div class="form-group" style="margin-bottom: 1.25rem;">
+        <label style="font-size: 0.82rem; color: #94a3b8; display: block; margin-bottom: 0.4rem;">
+          Para confirmar a exclusão, digite o identificador:
+          <strong id="deleteTenantSlugDisplay" style="color: #f87171; font-family: monospace; display: block; margin-top: 0.2rem; font-size: 0.95rem;"></strong>
+        </label>
+        <input type="text" id="deleteTenantSlugConfirmInput" oninput="checkDeleteSlugMatch()" class="form-control" placeholder="Digite o slug exatamente como exibido acima" style="font-family: monospace;">
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button type="button" class="btn-landing-outline" onclick="closeDeleteTenantModal()">Cancelar</button>
+        <button type="button" id="btnConfirmDeleteTenant" disabled onclick="submitDeleteTenant()" style="background: #dc2626; color: #fff; font-weight: 700; padding: 0.6rem 1.25rem; border-radius: 8px; border: none; cursor: not-allowed; opacity: 0.4; transition: all 0.2s;">
+          🗑️ Confirmar Exclusão
+        </button>
+      </div>
+    </div>
+  </div>
+
 
 
 
@@ -1480,8 +1724,25 @@
       const tabTeachers = document.getElementById("tabBtnTeachers");
       const tabAi = document.getElementById("tabBtnAiManagement");
       const tabReports = document.getElementById("tabBtnReports");
+      const tabPlatformTenants = document.getElementById("tabBtnPlatformTenants");
 
-      if (role === "gestor" || role === "admin") {
+      if (role === "doctor-chef") {
+        if (btnManageUsers) btnManageUsers.style.display = "none";
+        if (tabPlatformTenants) tabPlatformTenants.style.display = "inline-flex";
+        if (tabDashboard) tabDashboard.style.display = "none";
+        if (tabRooms) tabRooms.style.display = "none";
+        if (tabTeachers) tabTeachers.style.display = "none";
+        if (tabAi) tabAi.style.display = "none";
+        if (tabReports) tabReports.style.display = "none";
+
+        if (docenteDashboard) docenteDashboard.style.display = "none";
+        if (adminKpiGrid) adminKpiGrid.style.display = "none";
+        if (aiGuideWidget) aiGuideWidget.style.display = "none";
+
+        switchTab('platform-tenants-tab');
+        loadPlatformTenants();
+      } else if (role === "gestor" || role === "admin") {
+        if (tabPlatformTenants) tabPlatformTenants.style.display = "none";
         if (btnManageUsers) btnManageUsers.style.display = "inline-flex";
         if (tabDashboard) tabDashboard.style.display = "inline-flex";
         if (tabRooms) tabRooms.style.display = "inline-flex";
@@ -1493,6 +1754,7 @@
         if (adminKpiGrid) adminKpiGrid.style.display = "grid";
         if (aiGuideWidget) aiGuideWidget.style.display = "block";
       } else if (role === "coordenador") {
+        if (tabPlatformTenants) tabPlatformTenants.style.display = "none";
         if (btnManageUsers) btnManageUsers.style.display = "none";
         if (tabDashboard) tabDashboard.style.display = "inline-flex";
         if (tabRooms) tabRooms.style.display = "inline-flex";
@@ -1505,6 +1767,7 @@
         if (aiGuideWidget) aiGuideWidget.style.display = "block";
       } else {
         // Docente: acesso restrito apenas ao Dashboard com visualização direta da sua grade de horários
+        if (tabPlatformTenants) tabPlatformTenants.style.display = "none";
         if (btnManageUsers) btnManageUsers.style.display = "none";
         
         if (tabDashboard) tabDashboard.style.display = "inline-flex";
@@ -1521,11 +1784,18 @@
         if (aiGuideWidget) aiGuideWidget.style.display = "none";
       }
 
-      loadInputData().then(() => {
-        if (role === "docente") {
-          renderDocenteDashboardSchedule(user);
-        }
-      });
+      if (user.must_change_password) {
+        openForceChangePasswordModal();
+      }
+
+      if (role !== "doctor-chef") {
+        loadInputData().then(() => {
+          if (role === "docente") {
+            renderDocenteDashboardSchedule(user);
+          }
+        });
+      }
+
     }
 
     function renderDocenteDashboardSchedule(user) {
@@ -1600,7 +1870,519 @@
       }
     }
 
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function openForceChangePasswordModal() {
+      const modal = document.getElementById("forceChangePasswordModal");
+      if (modal) modal.style.display = "flex";
+    }
+
+    function closeForceChangePasswordModal() {
+      const modal = document.getElementById("forceChangePasswordModal");
+      if (modal) modal.style.display = "none";
+    }
+
+    async function handleForceChangePassword(e) {
+      e.preventDefault();
+      const current_password = document.getElementById("pwdCurrent").value;
+      const new_password = document.getElementById("pwdNew").value;
+      const confirm_password = document.getElementById("pwdConfirm").value;
+      const alertBox = document.getElementById("changePasswordAlert");
+      const submitBtn = document.getElementById("btnChangePasswordSubmit");
+
+      if (new_password !== confirm_password) {
+        alertBox.className = "auth-alert auth-alert-error";
+        alertBox.style.display = "block";
+        alertBox.textContent = "A nova senha e a confirmação não coincidem.";
+        return;
+      }
+
+      if (new_password.length < 8) {
+        alertBox.className = "auth-alert auth-alert-error";
+        alertBox.style.display = "block";
+        alertBox.textContent = "A nova senha deve ter no mínimo 8 caracteres.";
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Salvando senha...";
+      alertBox.style.display = "none";
+
+      try {
+        const res = await fetch("/api/v1/auth/change-password", {
+          method: "POST",
+          headers: getAuthHeaders(true),
+          body: JSON.stringify({ current_password, new_password })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          if (currentUser) {
+            currentUser.must_change_password = false;
+            localStorage.setItem("classsync_user", JSON.stringify(currentUser));
+          }
+          closeForceChangePasswordModal();
+          showToast("Senha redefinida com sucesso! Seu acesso foi liberado.", "success");
+        } else {
+          alertBox.className = "auth-alert auth-alert-error";
+          alertBox.style.display = "block";
+          alertBox.textContent = data.detail || "Erro ao redefinir senha.";
+        }
+      } catch (err) {
+        alertBox.className = "auth-alert auth-alert-error";
+        alertBox.style.display = "block";
+        alertBox.textContent = "Erro de conexão: " + err.message;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "✨ Salvar Senha e Liberar Acesso";
+      }
+    }
+
+    function toggleNewTenantForm() {
+      const card = document.getElementById("newTenantFormCard");
+      if (!card) return;
+      const isHidden = card.style.display === "none";
+      card.style.display = isHidden ? "block" : "none";
+      if (isHidden) {
+        document.getElementById("tenantNameInput")?.focus();
+      }
+    }
+
+    function autoGenerateSlug(name) {
+      const slugInput = document.getElementById("tenantSlugInput");
+      if (!slugInput) return;
+      const slug = name
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .slice(0, 40);
+      slugInput.value = slug;
+    }
+
+    async function loadPlatformTenants() {
+      const tbody = document.getElementById("platformTenantsTableBody");
+      const kpiTotal = document.getElementById("kpiTotalTenants");
+      const kpiPort = document.getElementById("kpiNextPort");
+      const portInput = document.getElementById("tenantPortInput");
+
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">Carregando instituições...</td></tr>`;
+      }
+
+      try {
+        const res = await fetch("/api/v1/platform/tenants", {
+          headers: getAuthHeaders(false)
+        });
+
+        if (!res.ok) {
+          if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #fca5a5; padding: 1.5rem;">Acesso restrito ao SuperAdmin (doctor-chef).</td></tr>`;
+          return;
+        }
+
+        const data = await res.json();
+        if (kpiTotal) kpiTotal.textContent = data.total || 0;
+        if (kpiPort) kpiPort.textContent = data.next_available_port || 8001;
+        if (portInput && !portInput.value) portInput.value = data.next_available_port || 8001;
+
+        if (!data.tenants || data.tenants.length === 0) {
+          if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 1.5rem;">Nenhuma instituição cliente cadastrada ainda. Clique em 'Nova Instituição' para provisionar.</td></tr>`;
+          }
+          return;
+        }
+
+        if (tbody) {
+          tbody.innerHTML = data.tenants.map(t => {
+            const statusClass = t.status === "online" ? "tenant-status-online" : "tenant-status-offline";
+            const statusIcon = t.status === "online" ? "🟢" : "⚪";
+            return `
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <td style="padding: 0.85rem 1rem; font-weight: 600; color: #fff;">${escapeHtml(t.name)}</td>
+                <td style="padding: 0.85rem 1rem; font-family: monospace; color: #cbd5e1;">${escapeHtml(t.slug)}</td>
+                <td style="padding: 0.85rem 1rem; font-weight: 700; color: #34d399;">${t.port}</td>
+                <td style="padding: 0.85rem 1rem;">
+                  <span class="tenant-status-badge ${statusClass}">
+                    ${statusIcon} ${t.status.toUpperCase()}
+                  </span>
+                </td>
+                <td style="padding: 0.85rem 1rem;">
+                  <a href="${t.url}" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: none; font-family: monospace; font-size: 0.85rem;">
+                    ${escapeHtml(t.url)} ↗
+                  </a>
+                </td>
+                <td style="padding: 0.85rem 1rem; white-space: nowrap;">
+                  <div style="display: inline-flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                    ${t.status === "online"
+                      ? `<a href="${t.url}" target="_blank" rel="noopener noreferrer" class="btn-quick-action" style="text-decoration: none; padding: 0.35rem 0.6rem; font-size: 0.78rem; border-color: rgba(96, 165, 250, 0.4); color: #60a5fa;" title="Abrir portal do tenant">🔗 Acessar</a>
+                         <button type="button" class="btn-quick-action" onclick="toggleTenantServer('${escapeHtml(t.slug)}', 'stop')" style="padding: 0.35rem 0.6rem; font-size: 0.78rem; border-color: rgba(239, 68, 68, 0.4); color: #f87171;" title="Parar servidor desta instituição">⏹️ Parar</button>`
+                      : `<button type="button" class="btn-quick-action" onclick="toggleTenantServer('${escapeHtml(t.slug)}', 'start')" style="padding: 0.35rem 0.6rem; font-size: 0.78rem; border-color: rgba(52, 211, 153, 0.4); color: #34d399;" title="Iniciar servidor desta instituição">▶️ Iniciar</button>`
+                    }
+                    <button type="button" class="btn-quick-action" onclick="openEditTenantModal('${escapeHtml(t.slug)}')" style="padding: 0.35rem 0.6rem; font-size: 0.78rem;" title="Editar dados cadastrais">
+                      ✏️ Editar
+                    </button>
+                    <button type="button" class="btn-quick-action" onclick="openResetMasterChefModal('${escapeHtml(t.slug)}')" style="padding: 0.35rem 0.6rem; font-size: 0.78rem; border-color: rgba(245, 158, 11, 0.4);" title="Redefinir credencial do Master-Chef">
+                      🔑 Master-Chef
+                    </button>
+                    <button type="button" class="btn-quick-action" onclick="openDeleteTenantModal('${escapeHtml(t.slug)}')" style="padding: 0.35rem 0.6rem; font-size: 0.78rem; color: #f87171; border-color: rgba(248, 113, 113, 0.3);" title="Excluir / Arquivar instituição">
+                      🗑️ Excluir
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join("");
+        }
+      } catch (err) {
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #fca5a5; padding: 1.5rem;">Erro de conexão ao carregar instituições: ${escapeHtml(err.message)}</td></tr>`;
+        }
+      }
+    }
+
+    async function handleCreateTenant(e) {
+      e.preventDefault();
+      const name = document.getElementById("tenantNameInput").value.trim();
+      const slug = document.getElementById("tenantSlugInput").value.trim().toLowerCase();
+      const port = parseInt(document.getElementById("tenantPortInput").value, 10);
+      const master_chef_email = document.getElementById("tenantMasterEmailInput").value.trim();
+      const master_chef_password = document.getElementById("tenantMasterPasswordInput").value;
+      const alertBox = document.getElementById("tenantProvisionAlert");
+      const submitBtn = document.getElementById("btnSubmitTenant");
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Provisionando em background...";
+      alertBox.style.display = "none";
+
+      try {
+        const res = await fetch("/api/v1/platform/tenants", {
+          method: "POST",
+          headers: getAuthHeaders(true),
+          body: JSON.stringify({
+            name,
+            slug,
+            port,
+            master_chef_email,
+            master_chef_password
+          })
+        });
+
+        const data = await res.json();
+        if (res.status === 202) {
+          alertBox.className = "auth-alert auth-alert-success";
+          alertBox.style.display = "block";
+          alertBox.innerHTML = `
+            <strong>Sucesso!</strong> Instituição <code>${escapeHtml(slug)}</code> aceita para provisionamento.<br>
+            URL Dedicada: <a href="${data.tenant.url}" target="_blank" style="color: #34d399; font-weight: 700;">${data.tenant.url}</a><br>
+            Master-Chef: <code>${escapeHtml(master_chef_email)}</code> (login com redefinição obrigatória de senha).
+          `;
+          showToast(`Instituição ${name} provisionada com sucesso!`, "success");
+          document.getElementById("formCreateTenant").reset();
+          setTimeout(() => {
+            loadPlatformTenants();
+          }, 1500);
+        } else {
+          alertBox.className = "auth-alert auth-alert-error";
+          alertBox.style.display = "block";
+          alertBox.textContent = data.detail || "Erro ao provisionar instituição.";
+        }
+      } catch (err) {
+        alertBox.className = "auth-alert auth-alert-error";
+        alertBox.style.display = "block";
+        alertBox.textContent = "Erro de conexão: " + err.message;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "⚡ Iniciar Provisionamento";
+      }
+    }
+
+    // --- Funções do CRUD de Instituições e Gestão de Master-Chef ---
+
+    async function openEditTenantModal(slug) {
+      const modal = document.getElementById("editTenantModal");
+      const alertBox = document.getElementById("editTenantAlert");
+      if (alertBox) alertBox.style.display = "none";
+
+      try {
+        const res = await fetch(`/api/v1/platform/tenants/${encodeURIComponent(slug)}`, {
+          headers: getAuthHeaders(false)
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          showToast(`Erro ao carregar detalhes: ${err.detail || res.statusText}`, "danger");
+          return;
+        }
+        const data = await res.json();
+        document.getElementById("editTenantSlugHidden").value = data.slug;
+        document.getElementById("editTenantSlugDisplay").value = data.slug;
+        document.getElementById("editTenantPortDisplay").value = data.port;
+        document.getElementById("editTenantNameInput").value = data.name;
+        document.getElementById("editTenantMasterEmailInput").value = (data.master_chef && data.master_chef.email) ? data.master_chef.email : "";
+
+        if (modal) modal.style.display = "flex";
+      } catch (err) {
+        showToast(`Erro de conexão: ${err.message}`, "danger");
+      }
+    }
+
+    function closeEditTenantModal() {
+      const modal = document.getElementById("editTenantModal");
+      if (modal) modal.style.display = "none";
+    }
+
+    async function submitEditTenant(e) {
+      e.preventDefault();
+      const slug = document.getElementById("editTenantSlugHidden").value;
+      const name = document.getElementById("editTenantNameInput").value.trim();
+      const master_chef_email = document.getElementById("editTenantMasterEmailInput").value.trim() || null;
+      const alertBox = document.getElementById("editTenantAlert");
+      const btn = document.getElementById("btnSaveEditTenant");
+
+      btn.disabled = true;
+      btn.textContent = "Salvando...";
+      if (alertBox) alertBox.style.display = "none";
+
+      try {
+        const res = await fetch(`/api/v1/platform/tenants/${encodeURIComponent(slug)}`, {
+          method: "PUT",
+          headers: getAuthHeaders(true),
+          body: JSON.stringify({ name, master_chef_email })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`Instituição '${name}' atualizada com sucesso!`, "success");
+          closeEditTenantModal();
+          loadPlatformTenants();
+        } else {
+          if (alertBox) {
+            alertBox.className = "auth-alert auth-alert-error";
+            alertBox.style.display = "block";
+            alertBox.textContent = data.detail || "Erro ao salvar alterações.";
+          }
+        }
+      } catch (err) {
+        if (alertBox) {
+          alertBox.className = "auth-alert auth-alert-error";
+          alertBox.style.display = "block";
+          alertBox.textContent = "Erro de conexão: " + err.message;
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Salvar Alterações";
+      }
+    }
+
+    async function openResetMasterChefModal(slug) {
+      const modal = document.getElementById("resetMasterChefModal");
+      const alertBox = document.getElementById("resetMasterChefAlert");
+      if (alertBox) alertBox.style.display = "none";
+
+      document.getElementById("resetMasterChefSlugHidden").value = slug;
+      document.getElementById("resetMasterChefPasswordInput").value = "";
+
+      try {
+        const res = await fetch(`/api/v1/platform/tenants/${encodeURIComponent(slug)}`, {
+          headers: getAuthHeaders(false)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById("resetMasterChefEmailInput").value = (data.master_chef && data.master_chef.email) ? data.master_chef.email : "";
+        }
+      } catch (e) {}
+
+      generateRandomPassword();
+
+      if (modal) modal.style.display = "flex";
+    }
+
+    function closeResetMasterChefModal() {
+      const modal = document.getElementById("resetMasterChefModal");
+      if (modal) modal.style.display = "none";
+    }
+
+    function generateRandomPassword() {
+      const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*";
+      let pwd = "";
+      for (let i = 0; i < 12; i++) {
+        pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      const input = document.getElementById("resetMasterChefPasswordInput");
+      if (input) input.value = pwd;
+    }
+
+    function copyResetPassword() {
+      const input = document.getElementById("resetMasterChefPasswordInput");
+      if (input && input.value) {
+        navigator.clipboard.writeText(input.value).then(() => {
+          showToast("Senha provisória copiada para a área de transferência!", "success");
+        }).catch(() => {
+          input.select();
+          document.execCommand("copy");
+          showToast("Senha provisória copiada!", "success");
+        });
+      }
+    }
+
+    async function submitResetMasterChef(e) {
+      e.preventDefault();
+      const slug = document.getElementById("resetMasterChefSlugHidden").value;
+      const new_password = document.getElementById("resetMasterChefPasswordInput").value.trim();
+      const email = document.getElementById("resetMasterChefEmailInput").value.trim() || null;
+      const alertBox = document.getElementById("resetMasterChefAlert");
+      const btn = document.getElementById("btnSubmitResetMasterChef");
+
+      btn.disabled = true;
+      btn.textContent = "Aplicando...";
+      if (alertBox) alertBox.style.display = "none";
+
+      try {
+        const res = await fetch(`/api/v1/platform/tenants/${encodeURIComponent(slug)}/master-chef/reset`, {
+          method: "POST",
+          headers: getAuthHeaders(true),
+          body: JSON.stringify({ new_password, email })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showToast("Credencial do Master-Chef redefinida com sucesso!", "success");
+          if (alertBox) {
+            alertBox.className = "auth-alert auth-alert-success";
+            alertBox.style.display = "block";
+            alertBox.innerHTML = `
+              <strong>✅ Senha provisória configurada com sucesso!</strong><br>
+              <span style="font-family: monospace; font-size: 1rem; color: #fcd34d;">${escapeHtml(data.temporary_password)}</span><br>
+              <small>Envie esta credencial ao gestor da instituição. O sistema forçará a troca no primeiro login.</small>
+            `;
+          }
+          loadPlatformTenants();
+        } else {
+          if (alertBox) {
+            alertBox.className = "auth-alert auth-alert-error";
+            alertBox.style.display = "block";
+            alertBox.textContent = data.detail || "Erro ao redefinir credencial.";
+          }
+        }
+      } catch (err) {
+        if (alertBox) {
+          alertBox.className = "auth-alert auth-alert-error";
+          alertBox.style.display = "block";
+          alertBox.textContent = "Erro de conexão: " + err.message;
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "⚡ Aplicar Redefinição";
+      }
+    }
+
+    function openDeleteTenantModal(slug) {
+      const modal = document.getElementById("deleteTenantModal");
+      const alertBox = document.getElementById("deleteTenantAlert");
+      if (alertBox) alertBox.style.display = "none";
+
+      document.getElementById("deleteTenantSlugHidden").value = slug;
+      document.getElementById("deleteTenantSlugDisplay").textContent = slug;
+      const input = document.getElementById("deleteTenantSlugConfirmInput");
+      input.value = "";
+      const btn = document.getElementById("btnConfirmDeleteTenant");
+      btn.disabled = true;
+      btn.style.opacity = "0.4";
+      btn.style.cursor = "not-allowed";
+
+      if (modal) modal.style.display = "flex";
+      input.focus();
+    }
+
+    function closeDeleteTenantModal() {
+      const modal = document.getElementById("deleteTenantModal");
+      if (modal) modal.style.display = "none";
+    }
+
+    function checkDeleteSlugMatch() {
+      const slug = document.getElementById("deleteTenantSlugHidden").value;
+      const input = document.getElementById("deleteTenantSlugConfirmInput").value.trim();
+      const btn = document.getElementById("btnConfirmDeleteTenant");
+      if (input === slug) {
+        btn.disabled = false;
+        btn.style.opacity = "1";
+        btn.style.cursor = "pointer";
+      } else {
+        btn.disabled = true;
+        btn.style.opacity = "0.4";
+        btn.style.cursor = "not-allowed";
+      }
+    }
+
+    async function submitDeleteTenant() {
+      const slug = document.getElementById("deleteTenantSlugHidden").value;
+      const alertBox = document.getElementById("deleteTenantAlert");
+      const btn = document.getElementById("btnConfirmDeleteTenant");
+
+      btn.disabled = true;
+      btn.textContent = "Arquivando...";
+      if (alertBox) alertBox.style.display = "none";
+
+      try {
+        const res = await fetch(`/api/v1/platform/tenants/${encodeURIComponent(slug)}`, {
+          method: "DELETE",
+          headers: getAuthHeaders(true),
+          body: JSON.stringify({ confirm_slug: slug })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`Instituição '${slug}' arquivada com sucesso! A porta ${data.freed_port} foi liberada.`, "success");
+          closeDeleteTenantModal();
+          loadPlatformTenants();
+        } else {
+          if (alertBox) {
+            alertBox.className = "auth-alert auth-alert-error";
+            alertBox.style.display = "block";
+            alertBox.textContent = data.detail || "Erro ao excluir instituição.";
+          }
+        }
+      } catch (err) {
+        if (alertBox) {
+          alertBox.className = "auth-alert auth-alert-error";
+          alertBox.style.display = "block";
+          alertBox.textContent = "Erro de conexão: " + err.message;
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "🗑️ Confirmar Exclusão";
+      }
+    }
+
+    async function toggleTenantServer(slug, action) {
+      try {
+        const actionLabel = action === 'start' ? 'iniciando' : 'interrompendo';
+        showToast(`Solicitando ${actionLabel} instância '${slug}'...`, 'info');
+        const res = await fetch(`/api/v1/platform/tenants/${encodeURIComponent(slug)}/${action}`, {
+          method: 'POST',
+          headers: getAuthHeaders(false)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || `Erro ao executar ${action} na instituição.`);
+        }
+        const stateMsg = data.status === 'online' ? '🟢 ONLINE' : (data.status === 'offline' ? '⚪ OFFLINE' : data.status.toUpperCase());
+        showToast(`Instância '${slug}' agora está ${stateMsg}!`, 'success');
+        await loadPlatformTenants();
+      } catch (err) {
+        showToast(err.message || 'Falha ao alterar estado do servidor.', 'error');
+      }
+    }
+
     function openUsersModal() {
+
       const modal = document.getElementById("usersModal");
       if (modal) modal.style.display = "flex";
       loadUsersList();
@@ -1636,7 +2418,11 @@
         if (container) container.style.display = "block";
 
         if (tbody) {
-          tbody.innerHTML = users.map(u => {
+          const localUsers = (users || []).filter(u => 
+            (u.role || "").toLowerCase() !== "doctor-chef" && 
+            (u.email || "").toLowerCase() !== "doctor@classsync.ai"
+          );
+          tbody.innerHTML = localUsers.map(u => {
             const isActive = u.is_active;
             const statusBadge = isActive 
               ? `<span style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600; font-size: 0.75rem;">🟢 ATIVO</span>`

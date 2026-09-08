@@ -116,9 +116,10 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
-    role = Column(String, default="docente", nullable=False)  # "gestor", "coordenador", "docente"
+    role = Column(String, default="docente", nullable=False)  # "doctor-chef", "gestor", "coordenador", "docente"
     department = Column(String, default="Geral", nullable=False)
     is_active = Column(Boolean, default=False, nullable=False)
+    must_change_password = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 

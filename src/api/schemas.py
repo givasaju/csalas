@@ -164,6 +164,7 @@ class UserResponse(BaseModel):
     role: str
     department: str
     is_active: bool
+    must_change_password: bool = False
     created_at: Optional[str] = None
 
 
@@ -176,6 +177,87 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1, description="Senha atual provisória ou definitiva")
+    new_password: str = Field(..., min_length=1, description="Nova senha privativa (mínimo 8 caracteres)")
+
+
+
+class TenantCreateRequest(BaseModel):
+    name: str = Field(..., min_length=3, max_length=100, description="Nome da instituição de ensino")
+    slug: str = Field(..., min_length=3, max_length=40, pattern=r'^[a-z0-9_]{3,40}$', description="Identificador único (slug) do tenant")
+    port: int = Field(..., ge=1024, le=65535, description="Porta TCP dedicada para a instância")
+    master_chef_email: str = Field(..., min_length=5, description="E-mail institucional do Gestor Geral (master-chef)")
+    master_chef_password: str = Field(..., min_length=8, description="Senha provisória do Gestor Geral")
+
+
+class TenantResponse(BaseModel):
+    name: str
+    slug: str
+    port: int
+    status: str
+    url: str
+    created_at: Optional[str] = None
+    master_chef_email: Optional[str] = None
+
+
+class TenantListResponse(BaseModel):
+    total: int
+    next_available_port: int
+    tenants: List[TenantResponse]
+
+
+class MasterChefInfo(BaseModel):
+    id: Optional[str] = None
+    email: str
+    name: Optional[str] = None
+    role: str = "gestor"
+    must_change_password: bool = True
+    is_active: bool = True
+
+
+class TenantDetailResponse(BaseModel):
+    name: str
+    slug: str
+    port: int
+    url: str
+    status: str
+    created_at: Optional[str] = None
+    container_name: Optional[str] = None
+    master_chef: Optional[MasterChefInfo] = None
+
+
+class TenantUpdateRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=120, description="Nome de exibição da instituição")
+    master_chef_email: Optional[str] = Field(None, min_length=5, description="Novo e-mail de contato do master-chef")
+
+
+class MasterChefResetRequest(BaseModel):
+    new_password: Optional[str] = Field(None, min_length=6, description="Nova senha provisória manual (mínimo 6 caracteres)")
+    email: Optional[str] = Field(None, min_length=5, description="Atualização opcional do e-mail do master-chef")
+
+
+class MasterChefResetResponse(BaseModel):
+    slug: str
+    email: str
+    temporary_password: str
+    must_change_password: bool = True
+    message: str = "Credencial provisória configurada com sucesso. O usuário deverá alterá-la no primeiro acesso."
+
+
+class TenantDeleteRequest(BaseModel):
+    confirm_slug: str = Field(..., description="Deve coincidir exatamente com o slug da instituição")
+
+
+class TenantDeleteResponse(BaseModel):
+    slug: str
+    status: str = "archived"
+    freed_port: int
+    archived_path: str
+    message: str = "Instituição arquivada e desprovisionada com sucesso."
+
 
 
 

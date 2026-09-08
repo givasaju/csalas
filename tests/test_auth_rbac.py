@@ -30,6 +30,27 @@ def setup_auth_db():
             )
             db.add(admin)
             db.commit()
+        else:
+            admin.is_active = True
+            db.commit()
+
+        # Garantir que o doctor-chef exista e esteja ativo
+        doctor = db.query(User).filter(User.email == "doctor@classsync.ai").first()
+        if not doctor:
+            doctor = User(
+                id="u-doctor-test",
+                name="Super Administrador Geral",
+                email="doctor@classsync.ai",
+                password_hash=hash_password("Doctor@2026"),
+                role="doctor-chef",
+                department="Plataforma Global",
+                is_active=True
+            )
+            db.add(doctor)
+            db.commit()
+        else:
+            doctor.is_active = True
+            db.commit()
     finally:
         db.close()
 
@@ -38,6 +59,10 @@ def setup_auth_db():
     db = SessionLocal()
     try:
         db.query(User).filter(User.email.like("%teste%")).delete()
+        doctor = db.query(User).filter(User.email == "doctor@classsync.ai").first()
+        if doctor:
+            doctor.is_active = True
+            doctor.role = "doctor-chef"
         db.commit()
     finally:
         db.close()
@@ -140,3 +165,102 @@ def test_admin_login_and_user_approval_flow():
     # 7. Docente não pode listar usuários (403)
     forbidden_res = client.get("/api/v1/users", headers={"Authorization": f"Bearer {user_token}"})
     assert forbidden_res.status_code == 403
+
+
+def test_users_list_omits_doctor_chef():
+    # 1. Garantir que doctor-chef existe no banco
+    db = SessionLocal()
+    try:
+        doctor = db.query(User).filter(User.role == "doctor-chef").first()
+        if not doctor:
+            doctor = User(
+                id="u-doctor-test",
+                name="Super Administrador Geral",
+                email="doctor@classsync.ai",
+                password_hash=hash_password("Doctor@2026"),
+                role="doctor-chef",
+                department="Plataforma Global",
+                is_active=True
+            )
+            db.add(doctor)
+            db.commit()
+    finally:
+        db.close()
+
+    # 2. Login como gestor
+    admin_login = client.post("/api/v1/auth/login", json={
+        "email": "admin@classsync.ai",
+        "password": "admin123"
+    })
+    assert admin_login.status_code == 200
+    token = admin_login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 3. Listar usuários
+    response = client.get("/api/v1/users", headers=headers)
+    assert response.status_code == 200
+    users = response.json()
+
+    # 4. Assegurar que nenhum usuário com role doctor-chef ou email doctor@classsync.ai é retornado
+    roles = [u.get("role") for u in users]
+    emails = [u.get("email") for u in users]
+    assert "doctor-chef" not in roles
+    assert "doctor@classsync.ai" not in emails
+
+
+def test_update_doctor_chef_status_forbidden():
+    # 1. Obter ID do doctor-chef
+    db = SessionLocal()
+    try:
+        doctor = db.query(User).filter(User.role == "doctor-chef").first()
+        if not doctor:
+            doctor = User(
+                id="u-doctor-test",
+                name="Super Administrador Geral",
+                email="doctor@classsync.ai",
+                password_hash=hash_password("Doctor@2026"),
+                role="doctor-chef",
+                department="Plataforma Global",
+                is_active=True
+            )
+            db.add(doctor)
+            db.commit()
+        doctor_id = doctor.id
+    finally:
+        db.close()
+
+    # 2. Login como gestor
+    admin_login = client.post("/api/v1/auth/login", json={
+        "email": "admin@classsync.ai",
+        "password": "admin123"
+    })
+    token = admin_login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 3. Tentar alterar status do doctor-chef (deve retornar 403 Forbidden)
+    res = client.patch(
+        f"/api/v1/users/{doctor_id}/status",
+        json={"is_active": False},
+        headers=headers
+    )
+    assert res.status_code == 403
+    assert "não é permitido alterar" in res.json()["detail"].lower()
+
+    # 4. Tentar alterar papel do doctor-chef para docente (deve retornar 403 Forbidden)
+    res_role = client.patch(
+        f"/api/v1/users/{doctor_id}/status",
+        json={"role": "docente"},
+        headers=headers
+    )
+    assert res_role.status_code == 403
+    assert "não é permitido alterar" in res_role.json()["detail"].lower()
+
+    # 5. Garantir que os atributos permanecem inalterados no banco
+    db = SessionLocal()
+    try:
+        doctor_check = db.query(User).filter(User.id == doctor_id).first()
+        assert doctor_check.is_active is True
+        assert doctor_check.role == "doctor-chef"
+    finally:
+        db.close()
+

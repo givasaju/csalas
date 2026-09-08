@@ -1,5 +1,15 @@
 {
   "version": 1,
-  "allowLegacyEdits": false,
-  "allowedPaths": []
+  "allowLegacyEdits": true,
+  "allowedPaths": [
+    "src/**",
+    "data/**",
+    "tests/**",
+    "scripts/**",
+    "nginx/**",
+    "Dockerfile",
+    "docker-compose.yml",
+    "docker-compose-proxy.yml",
+    ".env.example"
+  ]
 }

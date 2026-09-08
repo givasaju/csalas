@@ -3,12 +3,18 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from src.models import Base
 import os
 
-# Caminho do banco SQLite criado anteriormente
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'db', 'project.db'))
-SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
+# Caminho do banco configurável por variável de ambiente (SQLite padrão ou PostgreSQL)
+DEFAULT_DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'db', 'project.db'))
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
+
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite:///"):
+    sqlite_file = SQLALCHEMY_DATABASE_URL.replace("sqlite:///", "")
+    os.makedirs(os.path.dirname(os.path.abspath(sqlite_file)), exist_ok=True)
+
+connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    SQLALCHEMY_DATABASE_URL, connect_args=connect_args
 )
 
 # Session factory
@@ -57,6 +63,13 @@ with engine.connect() as conn:
     except Exception:
         conn.execute(text("ALTER TABLE Allocation ADD COLUMN subject VARCHAR"))
         conn.commit()
+
+    try:
+        conn.execute(text("SELECT must_change_password FROM User LIMIT 1"))
+    except Exception:
+        conn.execute(text("ALTER TABLE User ADD COLUMN must_change_password BOOLEAN DEFAULT 0"))
+        conn.commit()
+
 
 def seed_subslots():
     from src.models import SubslotTimeInterval
@@ -114,9 +127,25 @@ def seed_users():
                 password_hash=hash_password("admin123"),
                 role="gestor",
                 department="Administração Geral",
-                is_active=True
+                is_active=True,
+                must_change_password=False
             )
             db.add(admin_user)
+            db.commit()
+
+        doctor_user = db.query(User).filter(User.email == "doctor@classsync.ai").first()
+        if not doctor_user:
+            doctor_user = User(
+                id="u-doctor-001",
+                name="Super Administrador Geral",
+                email="doctor@classsync.ai",
+                password_hash=hash_password("Doctor@2026"),
+                role="doctor-chef",
+                department="Plataforma Global",
+                is_active=True,
+                must_change_password=False
+            )
+            db.add(doctor_user)
             db.commit()
     except Exception:
         db.rollback()

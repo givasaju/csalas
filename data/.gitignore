@@ -1,0 +1,3 @@
+# Ignorar bancos de dados de clientes e arquivos de dados locais em ./data/
+*
+!.gitignore

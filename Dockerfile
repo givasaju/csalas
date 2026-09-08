@@ -1,34 +1,38 @@
-# Use a imagem base oficial do Python (versão slim para menor tamanho da imagem)
+# syntax=docker/dockerfile:1
 FROM python:3.11-slim
 
-# Configurações de ambiente para otimizar a execução do Python em containers
+# Evitar criação de arquivos .pyc e buffer de saída
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8080
+    PORT=8000 \
+    HOST=0.0.0.0 \
+    TENANT_NAME=default \
+    DATABASE_URL=sqlite:////app/data/classsync.db
 
-# Define o diretório de trabalho dentro do container
 WORKDIR /app
 
-# Define o PYTHONPATH para incluir a raiz do projeto (/app)
-ENV PYTHONPATH=/app
-
-# Instala pacotes do sistema necessários para compilações leves (se necessário)
+# Instalar utilitários básicos e curl para health check
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copia e instala as dependências Python (utiliza cache de camadas do Docker)
+# Copiar e instalar dependências Python
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir sqlalchemy python-jose[cryptography]
 
-# Copia o código-fonte da aplicação para o container
-COPY . .
+# Criar pasta para volume persistente de dados
+RUN mkdir -p /app/data
 
-# Garante que a pasta do banco de dados exista
-RUN mkdir -p db
+# Copiar código da aplicação
+COPY src/ /app/src/
 
-# Porta exposta padrão (o Google Cloud Run injeta sua própria variável PORT dinamicamente)
-EXPOSE 8080
+# Expor porta
+EXPOSE 8000
 
-# Comando de inicialização configurado para aceitar a variável $PORT do Cloud Run
-CMD ["sh", "-c", "uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+# Health check usando a rota de health
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/api/v1/health || exit 1
+
+# Comando padrão de inicialização
+CMD ["sh", "-c", "uvicorn src.main:app --host ${HOST} --port ${PORT}"]

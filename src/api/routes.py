@@ -3,8 +3,11 @@ import uuid
 import logging
 import datetime
 from io import StringIO
+import socket
+import secrets
 
-from fastapi import APIRouter, HTTPException, Header, UploadFile, File, status, Depends
+
+from fastapi import APIRouter, HTTPException, Header, UploadFile, File, status, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from typing import List, Dict, Any, Optional
@@ -16,11 +19,15 @@ from src.api.schemas import (
     EmergencyReallocationOption, ProposedSubstitution,
     EmergencyReallocationCommitRequest, EmergencyReallocationCommitResponse,
     UserRegisterRequest, UserLoginRequest, UserResponse,
-    UserStatusUpdateRequest, LoginResponse
+    UserStatusUpdateRequest, LoginResponse, ChangePasswordRequest,
+    TenantCreateRequest, TenantResponse, TenantListResponse,
+    MasterChefInfo, TenantDetailResponse, TenantUpdateRequest,
+    MasterChefResetRequest, MasterChefResetResponse,
+    TenantDeleteRequest, TenantDeleteResponse
 )
 from src.api.auth import (
     hash_password, verify_password, create_access_token,
-    get_current_user, get_current_admin_user, require_roles, TokenData
+    get_current_user, get_current_admin_user, require_roles, require_doctor_chef, TokenData
 )
 
 from src.api.allocation_validator import check_consecutive_limit
@@ -44,6 +51,28 @@ def list_endpoints(authorization: str = Header(None)):
     # Build the absolute path to the static file within this package
     static_path = os.path.join(os.path.dirname(__file__), "static", "endpoints.html")
     return FileResponse(static_path)
+
+@router.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    """Health check endpoint returning status, database connectivity and configured tenant."""
+    tenant = os.environ.get("TENANT_NAME", "default")
+    db_status = "connected"
+    try:
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
+    except Exception as e:
+        db_status = f"disconnected: {str(e)}"
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"status": "unhealthy", "tenant": tenant, "database": db_status}
+        )
+    return {
+        "status": "healthy",
+        "tenant": tenant,
+        "version": "1.0.0",
+        "database": db_status,
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+    }
 
 def check_jwt_auth(authorization: str = Header(None)):
     """
@@ -1590,12 +1619,14 @@ def login_user(payload: UserLoginRequest, db: Session = Depends(get_db)):
             detail="Conta aguarda aprovação pelo gestor da plataforma."
         )
 
+    must_change = bool(getattr(user, "must_change_password", False))
     token_claims = {
         "sub": user.email,
         "id": user.id,
         "name": user.name,
         "role": user.role,
-        "department": user.department
+        "department": user.department,
+        "must_change_password": must_change
     }
     token = create_access_token(token_claims)
 
@@ -1610,6 +1641,7 @@ def login_user(payload: UserLoginRequest, db: Session = Depends(get_db)):
             "role": user.role,
             "department": user.department,
             "is_active": user.is_active,
+            "must_change_password": must_change,
             "created_at": user.created_at.isoformat() if user.created_at else None
         }
     }
@@ -1623,14 +1655,56 @@ def get_current_user_profile(current_user: TokenData = Depends(get_current_user)
         "name": current_user.name or current_user.username,
         "email": current_user.username,
         "role": current_user.role,
-        "department": current_user.department
+        "department": current_user.department,
+        "must_change_password": current_user.must_change_password
     }
+
+
+@router.post("/auth/change-password")
+def change_password(payload: ChangePasswordRequest, current_user: TokenData = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Redefinição de senha com validação de credencial atual e atualização no banco."""
+    user = db.query(models.User).filter(models.User.email == current_user.username).first()
+    if not user or not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Senha atual incorreta."
+        )
+
+    if not payload.new_password or len(payload.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A nova senha deve possuir no mínimo 8 caracteres."
+        )
+
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A nova senha deve ser diferente da senha atual."
+        )
+
+    user.password_hash = hash_password(payload.new_password)
+    user.must_change_password = False
+    db.commit()
+    db.refresh(user)
+
+    logger.info(f"[AUTH] Senha alterada com sucesso para {user.email}")
+    return {
+        "status": "success",
+        "message": "Senha atualizada com sucesso. Seu acesso foi liberado.",
+        "must_change_password": False
+    }
+
 
 
 @router.get("/users")
 def list_users(current_user: TokenData = Depends(require_roles(["gestor", "admin"])), db: Session = Depends(get_db)):
-    """Lista todos os usuários para gerenciamento pelo gestor."""
-    users = db.query(models.User).order_by(models.User.created_at.desc()).all()
+    """Lista todos os usuários para gerenciamento pelo gestor, omitindo superadministrador global."""
+    users = (
+        db.query(models.User)
+        .filter(models.User.role != "doctor-chef")
+        .order_by(models.User.created_at.desc())
+        .all()
+    )
     return [
         {
             "id": u.id,
@@ -1642,6 +1716,7 @@ def list_users(current_user: TokenData = Depends(require_roles(["gestor", "admin
             "created_at": u.created_at.isoformat() if u.created_at else None
         }
         for u in users
+        if (u.role or "").lower() != "doctor-chef" and (u.email or "").lower() != "doctor@classsync.ai"
     ]
 
 
@@ -1653,6 +1728,13 @@ def update_user_status(user_id: str, payload: UserStatusUpdateRequest, current_u
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Usuário não encontrado."
+        )
+
+    # Bloqueio de proteção: superadministrador da plataforma não pode ser alterado via gestão local
+    if (user.role or "").lower() == "doctor-chef" or (user.email or "").lower() == "doctor@classsync.ai":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Não é permitido alterar o status ou o perfil da conta do Super Administrador Geral."
         )
 
     if payload.is_active is not None:
@@ -1673,6 +1755,724 @@ def update_user_status(user_id: str, payload: UserStatusUpdateRequest, current_u
         "is_active": user.is_active,
         "created_at": user.created_at.isoformat() if user.created_at else None
     }
+
+
+def check_tenant_status(port: int) -> str:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.5)
+            if s.connect_ex(('127.0.0.1', port)) == 0:
+                return "online"
+    except Exception:
+        pass
+    return "offline"
+
+
+def discover_tenants() -> List[Dict[str, Any]]:
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    tenants = []
+    seen_slugs = set()
+
+    # 1. Buscar arquivos .env.<slug>
+    try:
+        for fname in os.listdir(root_dir):
+            if fname.startswith(".env.") and not fname.endswith(".example") and not fname.endswith(".bak"):
+                slug = fname[5:]
+                if not slug:
+                    continue
+                seen_slugs.add(slug)
+                port = 8001
+                env_path = os.path.join(root_dir, fname)
+                custom_name = None
+                master_chef_email = None
+                try:
+                    with open(env_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line.startswith("PORT="):
+                                port = int(line.split("=")[1].strip())
+                            elif line.startswith("INSTITUTION_NAME="):
+                                custom_name = line.split("=", 1)[1].strip()
+                            elif line.startswith("MASTER_CHEF_EMAIL="):
+                                master_chef_email = line.split("=", 1)[1].strip()
+                except Exception:
+                    pass
+
+                created_at = None
+                try:
+                    ctime = os.path.getctime(env_path)
+                    created_at = datetime.datetime.fromtimestamp(ctime, tz=datetime.timezone.utc).isoformat()
+                except Exception:
+                    pass
+
+                name = custom_name if custom_name else slug.replace("_", " ").replace("-", " ").title()
+                tenants.append({
+                    "name": name,
+                    "slug": slug,
+                    "port": port,
+                    "status": check_tenant_status(port),
+                    "url": f"http://localhost:{port}/",
+                    "created_at": created_at,
+                    "master_chef_email": master_chef_email
+                })
+    except Exception as e:
+        logger.warning(f"[TENANTS] Erro ao varrer root_dir: {e}")
+
+    # 2. Buscar pastas em data/
+    data_base_dir = os.path.join(root_dir, "data")
+    if os.path.exists(data_base_dir):
+        try:
+            for entry in os.listdir(data_base_dir):
+                full_path = os.path.join(data_base_dir, entry)
+                if os.path.isdir(full_path) and entry not in seen_slugs and not entry.startswith("."):
+                    seen_slugs.add(entry)
+                    port = 8001
+                    created_at = None
+                    try:
+                        ctime = os.path.getctime(full_path)
+                        created_at = datetime.datetime.fromtimestamp(ctime, tz=datetime.timezone.utc).isoformat()
+                    except Exception:
+                        pass
+                    name = entry.replace("_", " ").replace("-", " ").title()
+                    tenants.append({
+                        "name": name,
+                        "slug": entry,
+                        "port": port,
+                        "status": check_tenant_status(port),
+                        "url": f"http://localhost:{port}/",
+                        "created_at": created_at,
+                        "master_chef_email": None
+                    })
+        except Exception as e:
+            logger.warning(f"[TENANTS] Erro ao varrer data/: {e}")
+
+    tenants.sort(key=lambda t: t["port"])
+    return tenants
+
+
+def provision_tenant_task(name: str, slug: str, port: int, master_chef_email: str, master_chef_password: str):
+    """Executa a criação física de volumes, configuração de ambiente e seed do master-chef."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker, scoped_session
+
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    data_dir = os.path.join(root_dir, "data", slug)
+    os.makedirs(data_dir, exist_ok=True)
+
+    secret_key = secrets.token_hex(32)
+    env_file = os.path.join(root_dir, f".env.{slug}")
+    env_content = f"""TENANT_NAME={slug}
+INSTITUTION_NAME={name}
+MASTER_CHEF_EMAIL={master_chef_email}
+PORT={port}
+HOST=0.0.0.0
+DATA_DIR=./data/{slug}
+DATABASE_URL=sqlite:///./data/{slug}/project.db
+SECRET_KEY={secret_key}
+APP_ENV=production
+"""
+    with open(env_file, "w", encoding="utf-8") as f:
+        f.write(env_content)
+
+    # Inicializar banco SQLite isolado e criar tabelas
+    db_file = os.path.join(data_dir, "project.db")
+    tenant_db_url = f"sqlite:///{os.path.abspath(db_file)}"
+    tenant_engine = create_engine(tenant_db_url, connect_args={"check_same_thread": False})
+    models.Base.metadata.create_all(bind=tenant_engine)
+
+    TenantSession = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=tenant_engine))
+    db = TenantSession()
+    try:
+        user = db.query(models.User).filter(models.User.email == master_chef_email).first()
+        if not user:
+            user = models.User(
+                id=f"u-{slug}-master",
+                name="Gestor Geral Institucional",
+                email=master_chef_email,
+                password_hash=hash_password(master_chef_password),
+                role="gestor",
+                department="Administração Geral",
+                is_active=True,
+                must_change_password=True
+            )
+            db.add(user)
+            db.commit()
+    except Exception as e:
+        logger.error(f"[TENANT-PROVISION] Erro ao semear master-chef: {e}")
+        db.rollback()
+    finally:
+        db.close()
+        TenantSession.remove()
+        tenant_engine.dispose()
+
+    # Iniciar instância automaticamente (fora do ambiente de teste automatizado)
+    if not os.environ.get("PYTEST_CURRENT_TEST"):
+        start_tenant_instance(slug, port)
+
+
+def start_tenant_instance(slug: str, port: int) -> bool:
+    """Inicia a instância de um tenant (via docker compose ou processo local python)."""
+    import subprocess
+    import sys
+    import time
+    import shutil
+
+    if check_tenant_status(port) == "online":
+        return True
+
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    env_file = os.path.join(root_dir, f".env.{slug}")
+    env = os.environ.copy()
+    if os.path.exists(env_file):
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        env[k.strip()] = v.strip()
+        except Exception as e:
+            logger.warning(f"[TENANT-START] Erro ao ler env_file {env_file}: {e}")
+    else:
+        # Auto-gerar .env.{slug} para persistência das configurações da instituição
+        try:
+            db_path = _get_tenant_db_path(slug)
+            db_url = f"sqlite:///{os.path.abspath(db_path)}" if db_path else f"sqlite:///./data/{slug}/project.db"
+            institution_name = slug.replace("_", " ").replace("-", " ").title()
+            env_content = f"""TENANT_NAME={slug}
+INSTITUTION_NAME={institution_name}
+PORT={port}
+HOST=0.0.0.0
+DATA_DIR=./data/{slug}
+DATABASE_URL={db_url}
+SECRET_KEY={secrets.token_hex(32)}
+APP_ENV=production
+"""
+            with open(env_file, "w", encoding="utf-8") as f:
+                f.write(env_content)
+        except Exception as e:
+            logger.warning(f"[TENANT-START] Não foi possível persistir .env.{slug}: {e}")
+
+    env["PORT"] = str(port)
+    env["TENANT_NAME"] = slug
+    if "DATABASE_URL" not in env or not env["DATABASE_URL"]:
+        db_path = _get_tenant_db_path(slug)
+        if db_path:
+            env["DATABASE_URL"] = f"sqlite:///{os.path.abspath(db_path)}"
+        else:
+            env["DATABASE_URL"] = f"sqlite:///./data/{slug}/project.db"
+    env["APP_ENV"] = "production"
+
+    if shutil.which("docker"):
+        try:
+            res = subprocess.run(
+                ["docker", "compose", "--project-name", f"classsync-{slug}", "--env-file", env_file, "up", "-d", "--build"],
+                cwd=root_dir,
+                capture_output=True,
+                timeout=15
+            )
+            if res.returncode == 0:
+                time.sleep(1.0)
+                if check_tenant_status(port) == "online":
+                    return True
+        except Exception as e:
+            logger.warning(f"[TENANT-START] Falha ao subir via docker: {e}")
+
+    try:
+        kwargs = {}
+        if sys.platform == "win32":
+            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+        else:
+            kwargs["start_new_session"] = True
+
+        subprocess.Popen(
+            [sys.executable, "-m", "src.main"],
+            env=env,
+            cwd=root_dir,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            **kwargs
+        )
+        # Polling para aguardar a subida da instância (até 4 segundos)
+        for _ in range(12):
+            time.sleep(0.3)
+            if check_tenant_status(port) == "online":
+                return True
+        return check_tenant_status(port) == "online"
+    except Exception as e:
+        logger.error(f"[TENANT-START] Falha ao iniciar processo local para {slug}: {e}")
+        return False
+
+
+def stop_tenant_instance(slug: str, port: int) -> bool:
+    """Para a execução da instância de um tenant."""
+    import subprocess
+    import sys
+    import time
+    import shutil
+
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+    if shutil.which("docker"):
+        try:
+            subprocess.run(
+                ["docker", "compose", "--project-name", f"classsync-{slug}", "down"],
+                cwd=root_dir,
+                capture_output=True,
+                timeout=15
+            )
+        except Exception:
+            pass
+
+    try:
+        if sys.platform == "win32":
+            cmd = f'Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique'
+            res = subprocess.run(["powershell", "-NoProfile", "-Command", cmd], capture_output=True, text=True, timeout=5)
+            pids = res.stdout.strip().split()
+            for pid_str in pids:
+                if pid_str.isdigit() and int(pid_str) != os.getpid():
+                    subprocess.run(["taskkill", "/F", "/PID", pid_str], capture_output=True)
+        else:
+            cmd = f"fuser -k {port}/tcp"
+            subprocess.run(cmd, shell=True, capture_output=True)
+        time.sleep(0.5)
+        return check_tenant_status(port) == "offline"
+    except Exception as e:
+        logger.error(f"[TENANT-STOP] Falha ao finalizar tenant {slug} na porta {port}: {e}")
+        return False
+
+
+def auto_start_tenants():
+    """Inicia em segundo plano todas as instâncias de tenants que estiverem offline."""
+    import threading
+    import time
+
+    def _worker():
+        try:
+            time.sleep(1.0)
+            tenants = discover_tenants()
+            current_port = int(os.environ.get("PORT", 8000))
+            for t in tenants:
+                p = t.get("port")
+                s = t.get("slug")
+                if p and s and p != current_port:
+                    if check_tenant_status(p) == "offline":
+                        logger.info(f"[AUTO-START] Inicializando tenant '{s}' na porta {p}...")
+                        start_tenant_instance(s, p)
+        except Exception as e:
+            logger.warning(f"[AUTO-START] Falha ao auto-iniciar tenants: {e}")
+
+    thread = threading.Thread(target=_worker, daemon=True)
+    thread.start()
+
+
+def _get_tenant_db_path(slug: str) -> Optional[str]:
+    """Localiza o arquivo de banco SQLite da instituição."""
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    data_dir = os.path.join(root_dir, "data", slug)
+    for cand in ["project.db", "classsync.db"]:
+        p = os.path.join(data_dir, cand)
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def _get_tenant_master_chef_info(slug: str) -> Optional[Dict[str, Any]]:
+    """Lê as informações cadastrais do master-chef diretamente no SQLite da instituição."""
+    import sqlite3
+    db_path = _get_tenant_db_path(slug)
+    if not db_path:
+        root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        env_file = os.path.join(root_dir, f".env.{slug}")
+        email = None
+        if os.path.exists(env_file):
+            try:
+                with open(env_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.startswith("MASTER_CHEF_EMAIL="):
+                            email = line.split("=", 1)[1].strip()
+            except Exception:
+                pass
+        if email:
+            return {
+                "id": f"u-{slug}-master",
+                "email": email,
+                "name": "Gestor Geral Institucional",
+                "role": "gestor",
+                "must_change_password": True,
+                "is_active": True
+            }
+        return None
+
+    try:
+        conn = sqlite3.connect(f"file:{os.path.abspath(db_path)}?mode=ro", uri=True, timeout=5)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM User WHERE role = 'gestor' LIMIT 1")
+        row = cur.fetchone()
+        if not row:
+            cur.execute("SELECT * FROM User LIMIT 1")
+            row = cur.fetchone()
+        conn.close()
+        if row:
+            keys = row.keys()
+            return {
+                "id": str(row["id"]) if "id" in keys else f"u-{slug}-master",
+                "name": row["name"] if "name" in keys else "Gestor",
+                "email": row["email"] if "email" in keys else "",
+                "role": row["role"] if "role" in keys else "gestor",
+                "must_change_password": bool(row["must_change_password"]) if "must_change_password" in keys else False,
+                "is_active": bool(row["is_active"]) if "is_active" in keys else True
+            }
+    except Exception as e:
+        logger.warning(f"[_get_tenant_master_chef_info] Falha ao consultar SQLite do tenant {slug}: {e}")
+    return None
+
+
+def _update_tenant_metadata(slug: str, new_name: str, new_email: Optional[str] = None) -> bool:
+    """Atualiza metadados cadastrais da instituição e e-mail do master-chef."""
+    import sqlite3
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    env_file = os.path.join(root_dir, f".env.{slug}")
+
+    if os.path.exists(env_file):
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            new_lines = []
+            has_name = False
+            has_email = False
+            for line in lines:
+                if line.startswith("INSTITUTION_NAME=") and new_name:
+                    new_lines.append(f"INSTITUTION_NAME={new_name}\n")
+                    has_name = True
+                elif line.startswith("MASTER_CHEF_EMAIL=") and new_email:
+                    new_lines.append(f"MASTER_CHEF_EMAIL={new_email}\n")
+                    has_email = True
+                else:
+                    new_lines.append(line)
+            if new_name and not has_name:
+                new_lines.append(f"INSTITUTION_NAME={new_name}\n")
+            if new_email and not has_email:
+                new_lines.append(f"MASTER_CHEF_EMAIL={new_email}\n")
+            with open(env_file, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+        except Exception as e:
+            logger.warning(f"[_update_tenant_metadata] Erro ao atualizar .env.{slug}: {e}")
+
+    if new_email:
+        db_path = _get_tenant_db_path(slug)
+        if db_path and os.path.exists(db_path):
+            try:
+                conn = sqlite3.connect(db_path, timeout=10)
+                cur = conn.cursor()
+                cur.execute("UPDATE User SET email = ? WHERE role = 'gestor' OR id LIKE '%master%'", (new_email,))
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                logger.error(f"[_update_tenant_metadata] Erro ao atualizar e-mail no SQLite do tenant {slug}: {e}")
+                return False
+    return True
+
+
+def _reset_tenant_master_chef(slug: str, new_password: Optional[str] = None, new_email: Optional[str] = None) -> Dict[str, Any]:
+    """Redefine a credencial do master-chef na base isolada da instituição com must_change_password=True."""
+    import sqlite3
+    db_path = _get_tenant_db_path(slug)
+    if not db_path or not os.path.exists(db_path):
+        raise HTTPException(status_code=404, detail=f"Base de dados da instituição '{slug}' não encontrada.")
+
+    if not new_password:
+        chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*"
+        temp_pwd = "".join(secrets.choice(chars) for _ in range(12))
+    else:
+        temp_pwd = new_password
+
+    pwd_hash = hash_password(temp_pwd)
+
+    try:
+        conn = sqlite3.connect(db_path, timeout=10)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+
+        cur.execute("PRAGMA table_info(User);")
+        columns = [row[1] for row in cur.fetchall()]
+        if "must_change_password" not in columns:
+            cur.execute("ALTER TABLE User ADD COLUMN must_change_password BOOLEAN DEFAULT 0;")
+            conn.commit()
+
+        cur.execute("SELECT id, email FROM User WHERE role = 'gestor' OR id LIKE '%master%' LIMIT 1")
+        user = cur.fetchone()
+        if not user:
+            cur.execute("SELECT id, email FROM User LIMIT 1")
+            user = cur.fetchone()
+
+        if not user:
+            conn.close()
+            raise HTTPException(status_code=404, detail=f"Nenhum usuário gestor encontrado na instituição '{slug}'.")
+
+        user_id = user["id"]
+        target_email = new_email or user["email"]
+
+        if new_email:
+            cur.execute(
+                "UPDATE User SET password_hash = ?, must_change_password = 1, email = ? WHERE id = ?",
+                (pwd_hash, target_email, user_id)
+            )
+        else:
+            cur.execute(
+                "UPDATE User SET password_hash = ?, must_change_password = 1 WHERE id = ?",
+                (pwd_hash, user_id)
+            )
+        conn.commit()
+        conn.close()
+
+        if new_email:
+            _update_tenant_metadata(slug, new_name="", new_email=new_email)
+
+        return {
+            "slug": slug,
+            "email": target_email,
+            "temporary_password": temp_pwd,
+            "must_change_password": True,
+            "message": "Credencial provisória configurada com sucesso. O usuário deverá alterá-la no primeiro acesso."
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[_reset_tenant_master_chef] Erro ao resetar credencial do tenant {slug}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro interno ao resetar credencial do master-chef: {e}")
+
+
+def _archive_and_delete_tenant(slug: str) -> Dict[str, Any]:
+    """Interrompe a instância, arquiva os dados e libera a porta TCP."""
+    import shutil
+    tenants = discover_tenants()
+    tenant = next((t for t in tenants if t["slug"] == slug), None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail=f"Instituição '{slug}' não encontrada.")
+
+    port = tenant["port"]
+    stop_tenant_instance(slug, port)
+
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    data_dir = os.path.join(root_dir, "data", slug)
+    archived_base = os.path.join(root_dir, "data", ".archived")
+    os.makedirs(archived_base, exist_ok=True)
+
+    timestamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    target_archive = os.path.join(archived_base, f"{slug}_{timestamp}")
+
+    if os.path.exists(data_dir):
+        try:
+            shutil.move(data_dir, target_archive)
+        except Exception as e:
+            logger.warning(f"[_archive_and_delete_tenant] Falha ao mover pasta {data_dir}: {e}")
+            target_archive = data_dir
+
+    env_file = os.path.join(root_dir, f".env.{slug}")
+    if os.path.exists(env_file):
+        try:
+            env_target = os.path.join(target_archive, f".env.{slug}")
+            shutil.move(env_file, env_target)
+        except Exception as e:
+            logger.warning(f"[_archive_and_delete_tenant] Falha ao mover env file {env_file}: {e}")
+
+    return {
+        "slug": slug,
+        "status": "archived",
+        "freed_port": port,
+        "archived_path": target_archive,
+        "message": f"Instituição '{slug}' arquivada e desprovisionada com sucesso. A porta {port} foi liberada."
+    }
+
+
+@router.get("/platform/tenants", response_model=TenantListResponse)
+def list_platform_tenants(current_user: TokenData = Depends(require_doctor_chef)):
+    """Lista todas as instituições da plataforma e calcula a próxima porta livre. Exclusivo para doctor-chef."""
+    tenants = discover_tenants()
+    used_ports = set(t["port"] for t in tenants)
+    next_port = 8001
+    while next_port in used_ports:
+        next_port += 1
+
+    return {
+        "total": len(tenants),
+        "next_available_port": next_port,
+        "tenants": tenants
+    }
+
+
+@router.post("/platform/tenants", status_code=status.HTTP_202_ACCEPTED)
+def create_platform_tenant(
+    payload: TenantCreateRequest,
+    background_tasks: BackgroundTasks,
+    current_user: TokenData = Depends(require_doctor_chef)
+):
+    """Cria e provisiona uma nova instituição dedicada em BackgroundTasks. Exclusivo para doctor-chef."""
+    tenants = discover_tenants()
+    existing_slugs = set(t["slug"] for t in tenants)
+    used_ports = set(t["port"] for t in tenants)
+
+    if payload.slug in existing_slugs:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A instituição com identificador '{payload.slug}' já está cadastrada."
+        )
+
+    if payload.port in used_ports:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A porta TCP {payload.port} já está em uso por outra instituição."
+        )
+
+    # Dispara a automação de provisionamento em background
+    background_tasks.add_task(
+        provision_tenant_task,
+        payload.name,
+        payload.slug,
+        payload.port,
+        payload.master_chef_email,
+        payload.master_chef_password
+    )
+
+    logger.info(f"[PLATFORM] Novo tenant '{payload.slug}' aceito para provisionamento na porta {payload.port}")
+    return {
+        "status": "provisioning",
+        "message": "Provisionamento da instituição iniciado em background.",
+        "tenant": {
+            "name": payload.name,
+            "slug": payload.slug,
+            "port": payload.port,
+            "url": f"http://localhost:{payload.port}/",
+            "master_chef_email": payload.master_chef_email
+        }
+    }
+
+
+@router.post("/platform/tenants/{slug}/start")
+def start_platform_tenant(slug: str, current_user: TokenData = Depends(require_doctor_chef)):
+    """Inicia o servidor de uma instituição existente. Exclusivo para doctor-chef."""
+    tenants = discover_tenants()
+    tenant = next((t for t in tenants if t["slug"] == slug), None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Instituição não encontrada.")
+    port = tenant["port"]
+    success = start_tenant_instance(slug, port)
+    return {
+        "status": "online" if success or check_tenant_status(port) == "online" else "starting",
+        "slug": slug,
+        "port": port,
+        "url": tenant["url"]
+    }
+
+
+@router.post("/platform/tenants/{slug}/stop")
+def stop_platform_tenant(slug: str, current_user: TokenData = Depends(require_doctor_chef)):
+    """Para o servidor de uma instituição existente. Exclusivo para doctor-chef."""
+    tenants = discover_tenants()
+    tenant = next((t for t in tenants if t["slug"] == slug), None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Instituição não encontrada.")
+    port = tenant["port"]
+    success = stop_tenant_instance(slug, port)
+    return {
+        "status": "offline" if success or check_tenant_status(port) == "offline" else "stopping",
+        "slug": slug,
+        "port": port
+    }
+
+
+@router.get("/platform/tenants/{slug}", response_model=TenantDetailResponse)
+def get_platform_tenant_detail(slug: str, current_user: TokenData = Depends(require_doctor_chef)):
+    """Retorna detalhes aprofundados de uma instituição e de seu master-chef. Exclusivo para doctor-chef."""
+    tenants = discover_tenants()
+    tenant = next((t for t in tenants if t["slug"] == slug), None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail=f"Instituição '{slug}' não encontrada.")
+
+    master_chef_data = _get_tenant_master_chef_info(slug)
+    container_name = f"classsync_tenant_{slug}"
+
+    return {
+        "name": tenant["name"],
+        "slug": tenant["slug"],
+        "port": tenant["port"],
+        "url": tenant["url"],
+        "status": tenant["status"],
+        "created_at": tenant.get("created_at"),
+        "container_name": container_name,
+        "master_chef": master_chef_data
+    }
+
+
+@router.put("/platform/tenants/{slug}", response_model=TenantDetailResponse)
+def update_platform_tenant(
+    slug: str,
+    payload: TenantUpdateRequest,
+    current_user: TokenData = Depends(require_doctor_chef)
+):
+    """Atualiza metadados cadastrais da instituição e e-mail do master-chef. Exclusivo para doctor-chef."""
+    tenants = discover_tenants()
+    tenant = next((t for t in tenants if t["slug"] == slug), None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail=f"Instituição '{slug}' não encontrada.")
+
+    _update_tenant_metadata(slug, new_name=payload.name, new_email=payload.master_chef_email)
+
+    updated_tenants = discover_tenants()
+    updated_tenant = next((t for t in updated_tenants if t["slug"] == slug), tenant)
+    updated_master_chef = _get_tenant_master_chef_info(slug)
+
+    return {
+        "name": payload.name,
+        "slug": slug,
+        "port": updated_tenant["port"],
+        "url": updated_tenant["url"],
+        "status": updated_tenant["status"],
+        "created_at": updated_tenant.get("created_at"),
+        "container_name": f"classsync_tenant_{slug}",
+        "master_chef": updated_master_chef
+    }
+
+
+@router.post("/platform/tenants/{slug}/master-chef/reset", response_model=MasterChefResetResponse)
+def reset_platform_tenant_master_chef(
+    slug: str,
+    payload: Optional[MasterChefResetRequest] = None,
+    current_user: TokenData = Depends(require_doctor_chef)
+):
+    """Redefine a credencial do master-chef na base isolada do tenant ativando must_change_password=True. Exclusivo para doctor-chef."""
+    tenants = discover_tenants()
+    tenant = next((t for t in tenants if t["slug"] == slug), None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail=f"Instituição '{slug}' não encontrada.")
+
+    new_pwd = payload.new_password if payload else None
+    new_email = payload.email if payload else None
+
+    result = _reset_tenant_master_chef(slug, new_password=new_pwd, new_email=new_email)
+    return result
+
+
+@router.delete("/platform/tenants/{slug}", response_model=TenantDeleteResponse)
+def delete_platform_tenant(
+    slug: str,
+    payload: Optional[TenantDeleteRequest] = None,
+    confirm_slug: Optional[str] = None,
+    current_user: TokenData = Depends(require_doctor_chef)
+):
+    """Arquiva e remove a instituição cliente liberando a porta TCP. Exclusivo para doctor-chef."""
+    provided_slug = (payload.confirm_slug if payload else None) or confirm_slug
+    if not provided_slug or provided_slug != slug:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Confirmação inválida. Digite exatamente o identificador '{slug}' para confirmar a exclusão."
+        )
+
+    result = _archive_and_delete_tenant(slug)
+    return result
+
 
 
 

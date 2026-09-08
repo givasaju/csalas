@@ -1,0 +1,8 @@
+﻿Número do projeto
+1039733401434
+ID do projeto
+gen-lang-client-0858717444
+
+git remote add origin <URL_DO_REPOSITORIO>
+git push -u origin main
+

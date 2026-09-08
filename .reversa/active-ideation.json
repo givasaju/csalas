@@ -1,9 +1,9 @@
 {
-  "session-dir": "_reversa_sdd/brainstorms/003-landing-page-apresentacao-login",
-  "session-id": "003",
-  "short-name": "landing-page-apresentacao-login",
-  "idea": "vamos criar uma land page elegante, moderna e responsiva para apresentação da plataforma e login de usuários neste projeto de gerenciamento de salas",
+  "session-dir": "_reversa_sdd/brainstorms/005-admin-geral-instituicoes",
+  "session-id": "005",
+  "short-name": "admin-geral-instituicoes",
+  "idea": "como podemos criar uma interface du usuário admnistrador geral da plataforma para criação amigável de novas instituições com seus respectivos usuário 'master-chef' que deve assumir o papel de gestor geral da sua instituição que deverá definir quem será o usuárioo gestor/admin da instancia sua instituiução",
   "context": "legado",
-  "started-at": "2026-08-26T17:53:20-03:00",
+  "started-at": "2026-09-07T16:04:33-03:00",
   "current-stage": "done"
 }
