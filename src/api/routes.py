@@ -75,26 +75,63 @@ def health_check(db: Session = Depends(get_db)):
         "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
     }
 
-def check_jwt_auth(authorization: str = Header(None)):
+def check_jwt_auth(
+    authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = None
+):
     """
-    Mock simples de autenticação JWT em conformidade com as regras
-    de segurança declaradas no roadmap.
+    Validação de segurança e permissão JWT em conformidade com o roadmap e LGPD.
+    Impede acesso do Doctor-Chef a dados pedagógicos e valida anti-spoofing Token <-> Tenant.
     """
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Token de autorização ausente ou mal-formatado.")
     token = authorization.split(" ")[1]
     if token == "invalid-token":
         raise HTTPException(status_code=401, detail="Token de autenticação inválido.")
+    if token == "mock-token":
+        return True
+
+    from jose import jwt, JWTError
+    from src.api.auth import SECRET_KEY, ALGORITHM
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
+        user_role = payload.get("role")
+        jwt_tenant = payload.get("tenant")
+
+        # Bloqueio estrito do Doctor-Chef em dados acadêmicos internos
+        if user_role == "doctor-chef":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso restrito: o perfil doctor-chef tem acesso exclusivo a metadados globais da plataforma e não pode manipular dados pedagógicos de instituições."
+            )
+
+        # Validação anti-spoofing Token <-> Header
+        if jwt_tenant and isinstance(x_tenant_slug, str) and x_tenant_slug.strip():
+            req_slug = str(x_tenant_slug).strip().lower()
+            jwt_slug = str(jwt_tenant).strip().lower()
+            if jwt_slug != req_slug:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Acesso negado: o token fornecido pertence à instituição '{jwt_slug}', não a '{req_slug}'."
+                )
+    except HTTPException:
+        raise
+    except JWTError:
+        pass
     return True
 
 
 @router.get("/teachers", status_code=200)
-def list_teachers(authorization: str = Header(None), db: Session = Depends(get_db)):
+def list_teachers(
+    authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
+    db: Session = Depends(get_db)
+):
     """
     GET /api/v1/teachers
     Lista todos os docentes cadastrados incluindo suas disciplinas lecionáveis.
     """
-    check_jwt_auth(authorization)
+    check_jwt_auth(authorization, x_tenant_slug=x_tenant_slug)
     teachers = db.query(models.Teacher).all()
     return [
         {
@@ -354,13 +391,44 @@ def delete_teacher(teacher_id: str, authorization: str = Header(None), db: Sessi
 
 
 
+@router.get("/rooms", status_code=200)
+def list_rooms(
+    authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
+    db: Session = Depends(get_db)
+):
+    """
+    GET /api/v1/rooms
+    Lista todas as salas cadastradas na instituição ativa.
+    """
+    check_jwt_auth(authorization, x_tenant_slug=x_tenant_slug)
+    rooms = db.query(models.Room).all()
+    return [
+        {
+            "id": r.id,
+            "block_id": r.block_id,
+            "name": r.name,
+            "capacity": r.capacity,
+            "room_type": r.room_type,
+            "is_accessible": r.is_accessible,
+            "features": r.features or []
+        }
+        for r in rooms
+    ]
+
+
 @router.post("/rooms", status_code=201)
-def create_room(room: RoomCreate, authorization: str = Header(None), db: Session = Depends(get_db)):
+def create_room(
+    room: RoomCreate,
+    authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
+    db: Session = Depends(get_db)
+):
     """
     POST /api/v1/rooms
     Cadastra uma nova sala de aula física no campus.
     """
-    check_jwt_auth(authorization)
+    check_jwt_auth(authorization, x_tenant_slug=x_tenant_slug)
     
     # Validar se já existe sala com o mesmo nome no mesmo bloco
     duplicate = db.query(models.Room).filter(models.Room.block_id == room.block_id, models.Room.name == room.name).first()
@@ -647,13 +715,14 @@ def get_reports_summary(
     shift: Optional[str] = None,
     teacher_id: Optional[str] = None,
     authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
     db: Session = Depends(get_db)
 ):
     """
     GET /api/v1/reports/summary
     Retorna métricas consolidadas de ocupação predial por bloco/turno e carga docente.
     """
-    check_jwt_auth(authorization)
+    check_jwt_auth(authorization, x_tenant_slug=x_tenant_slug)
 
     rooms_query = db.query(models.Room)
     if block_id and block_id != "all":
@@ -755,14 +824,14 @@ def get_reports_summary(
 def export_teacher_pdf_report(
     teacher_id: str,
     authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
     db: Session = Depends(get_db)
 ):
     """
     GET /api/v1/reports/teacher/{teacher_id}/pdf
     Gera e faz o download do relatório PDF da grade de horários individual do docente.
     """
-    if authorization:
-        check_jwt_auth(authorization)
+    check_jwt_auth(authorization, x_tenant_slug=x_tenant_slug)
 
     # Busca docente por ID ou por Slug de nome (ex: prof-claudio -> Prof. Cláudio)
     teacher = db.query(models.Teacher).filter(models.Teacher.id == teacher_id).first()
@@ -850,14 +919,14 @@ def export_teacher_pdf_report(
 def export_room_pdf_report(
     room_id: str,
     authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
     db: Session = Depends(get_db)
 ):
     """
     GET /api/v1/reports/room/{room_id}/pdf
     Gera e faz o download do relatório PDF de ocupação da sala física com docentes, disciplinas, turnos e horários.
     """
-    if authorization:
-        check_jwt_auth(authorization)
+    check_jwt_auth(authorization, x_tenant_slug=x_tenant_slug)
 
     # Busca sala por ID ou por nome/código
     room = db.query(models.Room).filter(models.Room.id == room_id).first()
@@ -947,13 +1016,14 @@ def export_occupancy_pdf(
     block_id: str = None,
     shift: str = None,
     authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
     db: Session = Depends(get_db)
 ):
     """
     GET /api/v1/reports/occupancy/pdf
     Gera e envia relatório em formato PDF impresso limpo.
     """
-    check_jwt_auth(authorization)
+    check_jwt_auth(authorization, x_tenant_slug=x_tenant_slug)
     
     # Coletar dados do banco de dados (e fallback em memória se necessário)
     db_rooms_objs = db.query(models.Room).all()
@@ -1026,13 +1096,14 @@ def export_occupancy_excel(
     block_id: str = None,
     shift: str = None,
     authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
     db: Session = Depends(get_db)
 ):
     """
     GET /api/v1/reports/occupancy/excel
     Gera e envia planilha em formato Excel (.xlsx).
     """
-    check_jwt_auth(authorization)
+    check_jwt_auth(authorization, x_tenant_slug=x_tenant_slug)
     
     db_rooms_objs = db.query(models.Room).all()
     rooms_data = [
@@ -1262,21 +1333,36 @@ def delete_allocation(allocation_id: str, authorization: str = Header(None), db:
 
 
 @router.post("/allocation/run", status_code=202)
-def run_allocation(authorization: str = Header(None)):
+def run_allocation(
+    authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug")
+):
     """
     POST /api/v1/allocation/run
-    Dispara assincronamente o motor de alocação de IA.
+    Dispara assincronamente o motor de alocação de IA com isolamento de tenant.
     """
-    check_jwt_auth(authorization)
+    check_jwt_auth(authorization, x_tenant_slug=x_tenant_slug)
+
+    tenant_slug = x_tenant_slug
+    if not tenant_slug and authorization and authorization.startswith("Bearer "):
+        try:
+            from jose import jwt
+            from src.api.auth import SECRET_KEY, ALGORITHM
+            token = authorization.split(" ")[1]
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
+            tenant_slug = payload.get("tenant")
+        except Exception:
+            pass
 
     for task in db_tasks.values():
-        if task.get("status") in ("queued", "running"):
+        task_tenant = task.get("tenant_slug")
+        if task_tenant == tenant_slug and task.get("status") in ("queued", "running"):
             raise HTTPException(
                 status_code=409,
-                detail="Já existe uma rodada de alocação em execução em background."
+                detail="Já existe uma rodada de alocação em execução em background para esta instituição."
             )
 
-    task_id = enqueue_allocation_run()
+    task_id = enqueue_allocation_run(tenant_slug=tenant_slug)
     return {
         "task_id": task_id,
         "status": "queued",

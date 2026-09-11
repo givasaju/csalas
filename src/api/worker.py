@@ -2,10 +2,10 @@ import uuid
 import time
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from src.engine.core import CoreAllocationEngine
 from src import models
-from src.database import SessionLocal, get_db
+from src.database import SessionLocal, get_db, get_tenant_session
 
 logger = logging.getLogger("core-allocation-engine")
 
@@ -58,9 +58,9 @@ def save_emergency_reallocation_log(absent_teacher_id: str, start_date: str, end
     return log_id
 
 
-def execute_allocation_task(task_id: str):
+def execute_allocation_task(task_id: str, tenant_slug: Optional[str] = None):
     """
-    Worker que roda a alocação de IA em background e atualiza o progresso.
+    Worker que roda a alocação de IA em background e atualiza o progresso no banco isolado da instituição.
     """
     try:
         db_tasks[task_id]["status"] = "running"
@@ -69,43 +69,52 @@ def execute_allocation_task(task_id: str):
 
         db_tasks[task_id]["progress"] = 30
         
-        db = SessionLocal()
-        rooms = db.query(models.Room).all()
-        coordinations = db.query(models.Coordination).all()
-        classes = db.query(models.Class).all()
-        restrictions_objs = db.query(models.Restriction).all()
-        
-        rooms_list = [{"id": r.id, "block_id": r.block_id, "name": r.name, "capacity": r.capacity, "room_type": r.room_type, "is_accessible": r.is_accessible, "features": r.features or []} for r in rooms]
-        coordinations_list = [{"id": str(c.id), "name": c.name, "credits": c.credits} for c in coordinations]
-        classes_list = [{"id": c.id, "students_count": c.students_count, "room_type": c.room_type, "time_slot": c.time_slot, "coordination_id": str(c.coordination_id), "urgency": c.urgency, "require_accessibility": c.require_accessibility} for c in classes]
-        restrictions_list = [{"id": r.id, "teacher_id": r.teacher_id, "day_of_week": int(r.day_of_week), "time_slot_id": r.time_slot_id} for r in restrictions_objs]
+        if tenant_slug:
+            db = get_tenant_session(tenant_slug)
+            if db is None:
+                db = SessionLocal()
+        else:
+            db = SessionLocal()
 
-        engine = CoreAllocationEngine(rooms_list, coordinations_list, classes_list, restrictions=restrictions_list)
-        
-        db_tasks[task_id]["progress"] = 60
-        allocations, deactivated_blocks, bids = engine.run_allocation()
-        db_tasks[task_id]["bids"] = bids
-        
-        # Atualizar créditos das coordenações no banco de dados
-        for c in coordinations:
-            c.credits = engine.accs[str(c.id)].credits
-        
-        # Persistir logs do leilão
-        for bid in bids:
-            w_id = int(bid["winner_id"]) if str(bid["winner_id"]).isdigit() else None
-            l_id = int(bid["loser_id"]) if str(bid["loser_id"]).isdigit() else None
-            new_bid = models.AuctionBid(
-                id=str(uuid.uuid4()),
-                task_id=task_id,
-                room_id=bid["room_id"],
-                time_slot=bid["time_slot"],
-                winner_coordination_id=w_id,
-                loser_coordination_id=l_id,
-                credits_spent=bid["credits_spent"]
-            )
-            db.add(new_bid)
-        
-        db.commit()
+        try:
+            rooms = db.query(models.Room).all()
+            coordinations = db.query(models.Coordination).all()
+            classes = db.query(models.Class).all()
+            restrictions_objs = db.query(models.Restriction).all()
+            
+            rooms_list = [{"id": r.id, "block_id": r.block_id, "name": r.name, "capacity": r.capacity, "room_type": r.room_type, "is_accessible": r.is_accessible, "features": r.features or []} for r in rooms]
+            coordinations_list = [{"id": str(c.id), "name": c.name, "credits": c.credits} for c in coordinations]
+            classes_list = [{"id": c.id, "students_count": c.students_count, "room_type": c.room_type, "time_slot": c.time_slot, "coordination_id": str(c.coordination_id), "urgency": c.urgency, "require_accessibility": c.require_accessibility} for c in classes]
+            restrictions_list = [{"id": r.id, "teacher_id": r.teacher_id, "day_of_week": int(r.day_of_week), "time_slot_id": r.time_slot_id} for r in restrictions_objs]
+
+            engine = CoreAllocationEngine(rooms_list, coordinations_list, classes_list, restrictions=restrictions_list)
+            
+            db_tasks[task_id]["progress"] = 60
+            allocations, deactivated_blocks, bids = engine.run_allocation()
+            db_tasks[task_id]["bids"] = bids
+            
+            # Atualizar créditos das coordenações no banco de dados
+            for c in coordinations:
+                c.credits = engine.accs[str(c.id)].credits
+            
+            # Persistir logs do leilão
+            for bid in bids:
+                w_id = int(bid["winner_id"]) if str(bid["winner_id"]).isdigit() else None
+                l_id = int(bid["loser_id"]) if str(bid["loser_id"]).isdigit() else None
+                new_bid = models.AuctionBid(
+                    id=str(uuid.uuid4()),
+                    task_id=task_id,
+                    room_id=bid["room_id"],
+                    time_slot=bid["time_slot"],
+                    winner_coordination_id=w_id,
+                    loser_coordination_id=l_id,
+                    credits_spent=bid["credits_spent"]
+                )
+                db.add(new_bid)
+            
+            db.commit()
+        finally:
+            db.close()
 
         db_tasks[task_id]["progress"] = 100
         
@@ -128,19 +137,20 @@ def execute_allocation_task(task_id: str):
         db_tasks[task_id]["error_log"] = str(e)
 
 
-def enqueue_allocation_run() -> str:
+def enqueue_allocation_run(tenant_slug: Optional[str] = None) -> str:
     """
-    Adiciona uma nova rodada de alocação na fila do worker.
+    Adiciona uma nova rodada de alocação na fila do worker associada ao tenant especificado.
     """
     task_id = str(uuid.uuid4())
     db_tasks[task_id] = {
         "id": task_id,
+        "tenant_slug": tenant_slug,
         "status": "queued",
         "progress": 0,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "error_log": None,
         "result_summary": None
     }
-    # Enviar para execução assíncrona
-    executor.submit(execute_allocation_task, task_id)
+    # Enviar para execução assíncrona com contexto isolado do tenant
+    executor.submit(execute_allocation_task, task_id, tenant_slug)
     return task_id

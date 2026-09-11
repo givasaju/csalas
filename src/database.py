@@ -187,9 +187,43 @@ def get_tenant_session(slug: Optional[str]):
     return _tenant_session_factories[slug]()
 
 
-def get_db(x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug")):
+from fastapi import Header, Request, HTTPException
+
+
+def get_db(
+    request: Request = None,
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug")
+):
+    target_slug = None
     if isinstance(x_tenant_slug, str) and x_tenant_slug.strip():
-        t_session = get_tenant_session(x_tenant_slug.strip())
+        target_slug = x_tenant_slug.strip().lower()
+
+    if request:
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            if token not in ["mock-token", "invalid-token"]:
+                try:
+                    from jose import jwt
+                    from src.api.auth import SECRET_KEY, ALGORITHM
+                    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
+                    jwt_tenant = payload.get("tenant")
+                    if jwt_tenant:
+                        jwt_slug = str(jwt_tenant).strip().lower()
+                        # Validação anti-spoofing estrita entre Token e Header
+                        if target_slug and target_slug != jwt_slug:
+                            raise HTTPException(
+                                status_code=403,
+                                detail=f"Acesso negado: o token fornecido pertence à instituição '{jwt_slug}', não a '{target_slug}'."
+                            )
+                        target_slug = jwt_slug
+                except HTTPException:
+                    raise
+                except Exception:
+                    pass
+
+    if target_slug:
+        t_session = get_tenant_session(target_slug)
         if t_session:
             try:
                 yield t_session
