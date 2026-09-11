@@ -146,12 +146,17 @@ def list_teachers(
 
 
 @router.post("/teachers", status_code=201)
-def create_teacher(teacher: TeacherCreate, authorization: str = Header(None), db: Session = Depends(get_db)):
+def create_teacher(
+    teacher: TeacherCreate,
+    authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
+    db: Session = Depends(get_db)
+):
     """
     POST /api/v1/teachers
     Cadastra unitariamente um novo docente no sistema com suas disciplinas lecionáveis.
     """
-    check_jwt_auth(authorization)
+    check_jwt_auth(authorization, x_tenant_slug=x_tenant_slug)
     
     # Validar se disciplinas foram informadas
     clean_subjects = [s.strip() for s in (teacher.subjects or []) if s and s.strip()]
@@ -178,7 +183,12 @@ def create_teacher(teacher: TeacherCreate, authorization: str = Header(None), db
 
 
 @router.post("/teachers/import-csv", status_code=200)
-async def import_teachers_csv(file: UploadFile = File(...), authorization: str = Header(None), db: Session = Depends(get_db)):
+async def import_teachers_csv(
+    file: UploadFile = File(...),
+    authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
+    db: Session = Depends(get_db)
+):
     """
     POST /api/v1/teachers/import-csv
     Importação transacional de docentes em lote via arquivo CSV.
@@ -186,7 +196,7 @@ async def import_teachers_csv(file: UploadFile = File(...), authorization: str =
     As disciplinas na coluna devem ser separadas por ponto e vírgula (;).
     Política Tudo ou Nada.
     """
-    check_jwt_auth(authorization)
+    check_jwt_auth(authorization, x_tenant_slug=x_tenant_slug)
     
     try:
         content = await file.read()
@@ -989,12 +999,17 @@ def export_room_pdf_report(
 
 
 @router.delete("/rooms/{room_id}", status_code=200)
-def delete_room(room_id: str, authorization: str = Header(None), db: Session = Depends(get_db)):
+def delete_room(
+    room_id: str,
+    authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
+    db: Session = Depends(get_db)
+):
     """
     DELETE /api/v1/rooms/{room_id}
     Remove uma sala física se ela não possuir alocações ativas.
     """
-    check_jwt_auth(authorization)
+    check_jwt_auth(authorization, x_tenant_slug=x_tenant_slug)
     
     room = db.query(models.Room).filter(models.Room.id == room_id).first()
     if not room:
@@ -1170,12 +1185,17 @@ def export_occupancy_excel(
 
 
 @router.post("/allocations", status_code=201)
-def create_allocation(alloc: AllocationCreate, authorization: str = Header(None), db: Session = Depends(get_db)):
+def create_allocation(
+    alloc: AllocationCreate,
+    authorization: str = Header(None),
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
+    db: Session = Depends(get_db)
+):
     """
     POST /api/v1/allocations
     Cadastra uma alocação de aula de 50 min com trava de no máximo 4 aulas seguidas por turno.
     """
-    check_jwt_auth(authorization)
+    check_jwt_auth(authorization, x_tenant_slug=x_tenant_slug)
 
     shift_upper = alloc.shift.upper()
     if shift_upper not in ['M', 'T', 'N']:

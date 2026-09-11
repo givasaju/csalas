@@ -69,6 +69,7 @@ class TokenData(BaseModel):
     id: Optional[str] = None
     name: Optional[str] = None
     department: Optional[str] = None
+    tenant: Optional[str] = None
     must_change_password: bool = False
 
 
@@ -90,6 +91,7 @@ def verify_token(token: str) -> TokenData:
         user_id: str = payload.get("id")
         name: str = payload.get("name")
         department: str = payload.get("department")
+        tenant: str = payload.get("tenant")
         must_change_password: bool = bool(payload.get("must_change_password", False))
         if username is None:
             raise JWTError()
@@ -99,6 +101,7 @@ def verify_token(token: str) -> TokenData:
             id=user_id,
             name=name or username,
             department=department or "Geral",
+            tenant=tenant,
             must_change_password=must_change_password
         )
     except JWTError:

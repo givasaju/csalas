@@ -72,7 +72,7 @@ def execute_allocation_task(task_id: str, tenant_slug: Optional[str] = None):
         if tenant_slug:
             db = get_tenant_session(tenant_slug)
             if db is None:
-                db = SessionLocal()
+                raise RuntimeError(f"Base de dados da instituição '{tenant_slug}' não encontrada para execução da alocação.")
         else:
             db = SessionLocal()
 
