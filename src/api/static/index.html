@@ -29,6 +29,9 @@
           <a href="#sobre">Sobre o Projeto</a>
         </div>
         <div class="landing-nav-actions">
+          <button class="btn-landing-outline" style="border-color: rgba(245, 158, 11, 0.7); color: #fcd34d; display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600;" onclick="openAdminLoginModal()" title="Acesso do Super Administrador Geral da Plataforma">
+            <span>👑</span> Admin Geral
+          </button>
           <button class="btn-landing-outline" onclick="openLoginModal()">Entrar</button>
           <button class="btn-landing-primary" onclick="openRegisterModal()">Cadastre-se</button>
         </div>
@@ -51,6 +54,9 @@
           </button>
           <button class="btn-landing-outline" style="padding: 0.85rem 1.75rem; font-size: 1.05rem;" onclick="openRegisterModal()">
             ✨ Criar Conta Institucional
+          </button>
+          <button class="btn-landing-outline" style="padding: 0.85rem 1.75rem; font-size: 1.05rem; border-color: rgba(245, 158, 11, 0.7); color: #fcd34d; display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600;" onclick="openAdminLoginModal()" title="Painel de Controle e Governança de Instâncias">
+            👑 Painel Admin Geral
           </button>
         </div>
 
@@ -119,6 +125,8 @@
       <footer class="landing-footer" id="sobre">
         <div>
           <strong>ClassSync AI</strong> — Plataforma de Gerenciamento e Alocação Inteligente de Salas
+          <span style="margin: 0 0.5rem; opacity: 0.4;">|</span>
+          <a href="/admin" onclick="openAdminLoginModal(); return false;" style="color: #fcd34d; font-size: 0.82rem; text-decoration: underline; cursor: pointer;">👑 Acesso Super Administrador Geral (doctor-chef)</a>
         </div>
         <div style="display: flex; gap: 1.5rem;">
           <span>Status: 🟢 Operacional</span>
@@ -137,13 +145,24 @@
     <div class="auth-modal-box">
       <button class="auth-modal-close" onclick="closeLoginModal()">✕</button>
       <div class="auth-modal-header">
-        <h3>Acessar Plataforma</h3>
-        <p>Entre com suas credenciais institucionais</p>
+        <h3 id="loginModalTitle">Acessar Plataforma</h3>
+        <p id="loginModalSubtitle">Entre com suas credenciais institucionais</p>
       </div>
+
+      <!-- Seletor de Modo: Portal Acadêmico vs Admin Geral -->
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; background: rgba(0,0,0,0.25); padding: 0.3rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+        <button type="button" id="tabLoginAcademic" class="btn-quick-action active" style="flex: 1; text-align: center; justify-content: center; font-size: 0.82rem; padding: 0.5rem; cursor: pointer;" onclick="setLoginType('academic')">
+          🏛️ Portal Acadêmico
+        </button>
+        <button type="button" id="tabLoginAdmin" class="btn-quick-action" style="flex: 1; text-align: center; justify-content: center; font-size: 0.82rem; padding: 0.5rem; border-color: rgba(245,158,11,0.5); color: #fcd34d; cursor: pointer;" onclick="setLoginType('admin')">
+          👑 Admin Geral (doctor-chef)
+        </button>
+      </div>
+
       <div id="loginAlert" class="auth-alert"></div>
       <form id="formLogin" onsubmit="handleLogin(event)">
         <div class="auth-form-group">
-          <label for="loginEmail">E-mail Institucional</label>
+          <label for="loginEmail" id="lblLoginEmail">E-mail Institucional</label>
           <input type="email" id="loginEmail" class="auth-form-input" placeholder="seu.nome@universidade.edu.br" required autocomplete="username">
         </div>
         <div class="auth-form-group">
@@ -152,7 +171,7 @@
         </div>
         <button type="submit" id="btnLoginSubmit" class="auth-btn-submit">Entrar no Sistema</button>
       </form>
-      <div class="auth-switch-text">
+      <div class="auth-switch-text" id="loginRegisterSwitch">
         Não possui uma conta? <a onclick="switchToRegisterModal()">Cadastre-se aqui</a>
       </div>
     </div>
@@ -1546,9 +1565,36 @@
     // Detecção e Isolamento de Contexto de Tenant via URL (?tenant=slug)
     const urlParams = new URLSearchParams(window.location.search);
     const tenantParam = urlParams.get("tenant");
-    let currentTenantSlug = tenantParam ? tenantParam.trim().toLowerCase() : (localStorage.getItem("classsync_tenant") || null);
+    const isAdminUrlRequested = window.location.pathname.startsWith('/admin') ||
+                                window.location.pathname.startsWith('/platform') ||
+                                window.location.pathname.startsWith('/superadmin') ||
+                                window.location.pathname.startsWith('/administrador') ||
+                                urlParams.has('admin') ||
+                                urlParams.has('platform') ||
+                                window.location.hash.includes('admin') ||
+                                window.location.hash.includes('platform-tenants');
+
+    let currentTenantSlug = null;
     if (tenantParam) {
+      currentTenantSlug = tenantParam.trim().toLowerCase();
       localStorage.setItem("classsync_tenant", currentTenantSlug);
+    } else if (isAdminUrlRequested) {
+      // Quando o usuário acessa rotas de administração geral, limpa qualquer tenant residual
+      localStorage.removeItem("classsync_tenant");
+      currentTenantSlug = null;
+    } else {
+      // Acesso à raiz sem parâmetro: se o usuário logado for doctor-chef, não restaura tenant
+      const cachedUserStr = localStorage.getItem("classsync_user");
+      let isDoctor = false;
+      if (cachedUserStr) {
+        try { isDoctor = JSON.parse(cachedUserStr).role === "doctor-chef"; } catch (e) {}
+      }
+      if (isDoctor) {
+        localStorage.removeItem("classsync_tenant");
+        currentTenantSlug = null;
+      } else {
+        currentTenantSlug = localStorage.getItem("classsync_tenant") || null;
+      }
     }
 
     let currentToken = localStorage.getItem("classsync_token") || null;
@@ -1597,12 +1643,105 @@
       return headers;
     }
 
+    let currentLoginType = "academic";
+
+    function setLoginType(type) {
+      currentLoginType = type;
+      const title = document.getElementById("loginModalTitle");
+      const subtitle = document.getElementById("loginModalSubtitle");
+      const btnAcademic = document.getElementById("tabLoginAcademic");
+      const btnAdmin = document.getElementById("tabLoginAdmin");
+      const emailInput = document.getElementById("loginEmail");
+      const pwdInput = document.getElementById("loginPassword");
+      const submitBtn = document.getElementById("btnLoginSubmit");
+      const lblEmail = document.getElementById("lblLoginEmail");
+      const regSwitch = document.getElementById("loginRegisterSwitch");
+      const alertBox = document.getElementById("loginAlert");
+
+      if (alertBox) alertBox.style.display = "none";
+
+      if (type === "admin") {
+        if (btnAcademic) btnAcademic.classList.remove("active");
+        if (btnAdmin) btnAdmin.classList.add("active");
+        if (title) title.innerHTML = `👑 Super Administrador Geral`;
+        if (subtitle) subtitle.textContent = `Acesso à governança da plataforma e provisionamento de instâncias`;
+        if (lblEmail) lblEmail.textContent = `E-mail do SuperAdmin`;
+        if (emailInput) {
+          emailInput.value = "doctor@classsync.ai";
+          emailInput.placeholder = "doctor@classsync.ai";
+        }
+        if (pwdInput) {
+          pwdInput.value = "Doctor@2026";
+        }
+        if (submitBtn) {
+          submitBtn.textContent = "Entrar como Administrador Geral";
+          submitBtn.style.background = "linear-gradient(135deg, #f59e0b, #d97706)";
+          submitBtn.style.color = "#000";
+          submitBtn.style.fontWeight = "700";
+        }
+        if (regSwitch) regSwitch.style.display = "none";
+
+        // Admin Geral nunca utiliza contexto de tenant isolado
+        currentTenantSlug = null;
+        localStorage.removeItem("classsync_tenant");
+      } else {
+        if (btnAdmin) btnAdmin.classList.remove("active");
+        if (btnAcademic) btnAcademic.classList.add("active");
+        if (title) title.textContent = `Acessar Plataforma`;
+        if (subtitle) subtitle.textContent = `Entre com suas credenciais institucionais`;
+        if (lblEmail) lblEmail.textContent = `E-mail Institucional`;
+        if (emailInput && emailInput.value === "doctor@classsync.ai") {
+          emailInput.value = "";
+          emailInput.placeholder = "seu.nome@universidade.edu.br";
+        }
+        if (pwdInput && pwdInput.value === "Doctor@2026") {
+          pwdInput.value = "";
+        }
+        if (submitBtn) {
+          submitBtn.textContent = "Entrar no Sistema";
+          submitBtn.style.background = "";
+          submitBtn.style.color = "";
+          submitBtn.style.fontWeight = "";
+        }
+        if (regSwitch) regSwitch.style.display = "block";
+      }
+    }
+
+    function openAdminLoginModal() {
+      openLoginModal();
+      setLoginType("admin");
+    }
+
+    function returnToPlatformAdmin(e) {
+      if (e) e.preventDefault();
+      localStorage.removeItem("classsync_tenant");
+      currentTenantSlug = null;
+      window.location.href = "/admin";
+    }
+
     async function initTenantContext() {
       if (!currentTenantSlug) return;
 
-      // Ocultar terminantemente a aba de Administração Geral
+      // Ocultar terminantemente a aba de Administração Geral dentro do portal do tenant
       const tabPlatformTenants = document.getElementById("tabBtnPlatformTenants");
       if (tabPlatformTenants) tabPlatformTenants.style.display = "none";
+
+      // Adicionar banner de topo para retorno à governança global caso não exista
+      let topReturnBanner = document.getElementById("tenantTopAdminReturn");
+      if (!topReturnBanner) {
+        topReturnBanner = document.createElement("div");
+        topReturnBanner.id = "tenantTopAdminReturn";
+        topReturnBanner.style.cssText = "background: rgba(15, 23, 42, 0.96); border-bottom: 1px solid rgba(245, 158, 11, 0.35); padding: 0.5rem 1.5rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; z-index: 9999; position: relative;";
+        topReturnBanner.innerHTML = `
+          <span style="color: #cbd5e1; display: inline-flex; align-items: center; gap: 0.4rem;">
+            🏛️ Instância Isolada Ativa: <strong style="color: #60a5fa;">${escapeHtml(currentTenantSlug)}</strong>
+          </span>
+          <a href="/admin" onclick="returnToPlatformAdmin(event)" style="color: #fcd34d; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;">
+            <span>👑</span> Acessar Administração Geral (doctor-chef) ↗
+          </a>
+        `;
+        document.body.insertBefore(topReturnBanner, document.body.firstChild);
+      }
 
       try {
         const res = await fetch(`/api/v1/tenant/info?slug=${encodeURIComponent(currentTenantSlug)}`, {
@@ -1635,6 +1774,7 @@
       const alertBox = document.getElementById("loginAlert");
       if (alertBox) { alertBox.style.display = "none"; alertBox.textContent = ""; }
       if (modal) modal.style.display = "flex";
+      setLoginType(currentLoginType || "academic");
       setTimeout(() => document.getElementById("loginEmail")?.focus(), 100);
     }
 
@@ -1678,14 +1818,17 @@
       alertBox.style.display = "none";
 
       try {
+        const isDoctor = email.toLowerCase() === "doctor@classsync.ai" || currentLoginType === "admin";
+        const effectiveTenant = isDoctor ? null : currentTenantSlug;
+
         const payload = { email, password };
-        if (currentTenantSlug) {
-          payload.tenant_slug = currentTenantSlug;
+        if (effectiveTenant) {
+          payload.tenant_slug = effectiveTenant;
         }
 
         const headers = { "Content-Type": "application/json" };
-        if (currentTenantSlug) {
-          headers["X-Tenant-Slug"] = currentTenantSlug;
+        if (effectiveTenant) {
+          headers["X-Tenant-Slug"] = effectiveTenant;
         }
 
         const res = await fetch("/api/v1/auth/login", {
@@ -1698,8 +1841,11 @@
         if (res.ok) {
           currentToken = data.access_token;
           currentUser = data.user;
-          if (currentTenantSlug) {
-            currentUser.tenant = currentTenantSlug;
+          if (isDoctor || currentUser.role === "doctor-chef") {
+            currentTenantSlug = null;
+            localStorage.removeItem("classsync_tenant");
+          } else if (effectiveTenant) {
+            currentUser.tenant = effectiveTenant;
           }
           localStorage.setItem("classsync_token", currentToken);
           localStorage.setItem("classsync_user", JSON.stringify(currentUser));
@@ -5767,7 +5913,22 @@
       if (countEl) countEl.textContent = `${res.totalClasses} aula(s) semanal(is)`;
     }
     initTenantContext();
-    checkAuthSession();
+    checkAuthSession().then(() => {
+      if (isAdminUrlRequested) {
+        let isDoc = false;
+        try {
+          const cached = JSON.parse(localStorage.getItem("classsync_user") || "{}");
+          if (cached.role === "doctor-chef") isDoc = true;
+        } catch (e) {}
+
+        if (currentToken && isDoc) {
+          switchTab('platform-tenants-tab');
+          loadPlatformTenants();
+        } else {
+          openAdminLoginModal();
+        }
+      }
+    });
     updateAllocSubSlotOptions();
     setTimeout(() => {
       populateAllocSelectors();

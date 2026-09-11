@@ -2,15 +2,34 @@ import os
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from src.api.routes import router
 
 app = FastAPI(title="ClassSync AI - Allocation Engine API", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(router)
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "api", "static")
 
 @app.get("/")
+@app.get("/admin")
+@app.get("/admin/")
+@app.get("/platform")
+@app.get("/platform/")
+@app.get("/superadmin")
+@app.get("/superadmin/")
+@app.get("/administrador")
+@app.get("/administrador/")
+@app.get("/admin-geral")
+@app.get("/admin-geral/")
 def read_root():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
