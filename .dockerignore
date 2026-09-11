@@ -24,3 +24,10 @@ _reversa_forward/
 .agents/
 .antigravity/
 .claude/
+
+.env
+.env.*
+*.log
+data/
+db/*.db
+*.sqlite3

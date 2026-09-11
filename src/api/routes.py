@@ -7,7 +7,7 @@ import socket
 import secrets
 
 
-from fastapi import APIRouter, HTTPException, Header, UploadFile, File, status, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Header, UploadFile, File, status, Depends, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from typing import List, Dict, Any, Optional
@@ -1757,6 +1757,49 @@ def update_user_status(user_id: str, payload: UserStatusUpdateRequest, current_u
     }
 
 
+def get_request_base_url(request: Optional[Request] = None) -> Optional[str]:
+    """Identifica a URL pública da aplicação a partir de env vars ou cabeçalhos HTTP do proxy."""
+    env_base = os.environ.get("BASE_URL") or os.environ.get("APP_URL") or os.environ.get("PUBLIC_URL")
+    if env_base:
+        return env_base.strip().rstrip("/")
+    if request:
+        proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+        if host and not any(h in host for h in ["localhost", "127.0.0.1", "testserver"]):
+            return f"{proto}://{host}"
+        if request.base_url:
+            b = str(request.base_url).rstrip("/")
+            if not any(h in b for h in ["localhost", "127.0.0.1", "testserver"]):
+                return b
+    return None
+
+
+def is_cloud_environment(base_url: Optional[str] = None) -> bool:
+    """Verifica se a aplicação está em ambiente de nuvem (ex: Google Cloud Run)."""
+    if os.environ.get("K_SERVICE") or os.environ.get("CLOUD_RUN_JOB"):
+        return True
+    env_base = os.environ.get("BASE_URL") or os.environ.get("APP_URL") or os.environ.get("PUBLIC_URL")
+    if env_base and not any(h in env_base for h in ["localhost", "127.0.0.1", "testserver"]):
+        return True
+    if base_url and not any(h in base_url for h in ["localhost", "127.0.0.1", "testserver"]):
+        return True
+    return False
+
+
+def resolve_tenant_url(port: int, base_url: Optional[str] = None, slug: Optional[str] = None) -> str:
+    """
+    Retorna a URL dedicada da instituição/tenant.
+    Em ambiente de nuvem (como Cloud Run), retorna a URL base pública.
+    Em desenvolvimento local, retorna http://localhost:{port}/.
+    """
+    if base_url:
+        return f"{base_url.rstrip('/')}/"
+    env_base = os.environ.get("BASE_URL") or os.environ.get("APP_URL") or os.environ.get("PUBLIC_URL")
+    if env_base:
+        return f"{env_base.strip().rstrip('/')}/"
+    return f"http://localhost:{port}/"
+
+
 def check_tenant_status(port: int) -> str:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -1768,10 +1811,11 @@ def check_tenant_status(port: int) -> str:
     return "offline"
 
 
-def discover_tenants() -> List[Dict[str, Any]]:
+def discover_tenants(base_url: Optional[str] = None) -> List[Dict[str, Any]]:
     root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     tenants = []
     seen_slugs = set()
+    is_cloud = is_cloud_environment(base_url)
 
     # 1. Buscar arquivos .env.<slug>
     try:
@@ -1810,8 +1854,8 @@ def discover_tenants() -> List[Dict[str, Any]]:
                     "name": name,
                     "slug": slug,
                     "port": port,
-                    "status": check_tenant_status(port),
-                    "url": f"http://localhost:{port}/",
+                    "status": "online" if is_cloud else check_tenant_status(port),
+                    "url": resolve_tenant_url(port, base_url, slug),
                     "created_at": created_at,
                     "master_chef_email": master_chef_email
                 })
@@ -1838,8 +1882,8 @@ def discover_tenants() -> List[Dict[str, Any]]:
                         "name": name,
                         "slug": entry,
                         "port": port,
-                        "status": check_tenant_status(port),
-                        "url": f"http://localhost:{port}/",
+                        "status": "online" if is_cloud else check_tenant_status(port),
+                        "url": resolve_tenant_url(port, base_url, entry),
                         "created_at": created_at,
                         "master_chef_email": None
                     })
@@ -2288,9 +2332,13 @@ def _archive_and_delete_tenant(slug: str) -> Dict[str, Any]:
 
 
 @router.get("/platform/tenants", response_model=TenantListResponse)
-def list_platform_tenants(current_user: TokenData = Depends(require_doctor_chef)):
+def list_platform_tenants(
+    request: Request = None,
+    current_user: TokenData = Depends(require_doctor_chef)
+):
     """Lista todas as instituições da plataforma e calcula a próxima porta livre. Exclusivo para doctor-chef."""
-    tenants = discover_tenants()
+    base_url = get_request_base_url(request)
+    tenants = discover_tenants(base_url=base_url)
     used_ports = set(t["port"] for t in tenants)
     next_port = 8001
     while next_port in used_ports:
@@ -2307,10 +2355,12 @@ def list_platform_tenants(current_user: TokenData = Depends(require_doctor_chef)
 def create_platform_tenant(
     payload: TenantCreateRequest,
     background_tasks: BackgroundTasks,
+    request: Request = None,
     current_user: TokenData = Depends(require_doctor_chef)
 ):
     """Cria e provisiona uma nova instituição dedicada em BackgroundTasks. Exclusivo para doctor-chef."""
-    tenants = discover_tenants()
+    base_url = get_request_base_url(request)
+    tenants = discover_tenants(base_url=base_url)
     existing_slugs = set(t["slug"] for t in tenants)
     used_ports = set(t["port"] for t in tenants)
 
@@ -2344,16 +2394,21 @@ def create_platform_tenant(
             "name": payload.name,
             "slug": payload.slug,
             "port": payload.port,
-            "url": f"http://localhost:{payload.port}/",
+            "url": resolve_tenant_url(payload.port, base_url=base_url, slug=payload.slug),
             "master_chef_email": payload.master_chef_email
         }
     }
 
 
 @router.post("/platform/tenants/{slug}/start")
-def start_platform_tenant(slug: str, current_user: TokenData = Depends(require_doctor_chef)):
+def start_platform_tenant(
+    slug: str,
+    request: Request = None,
+    current_user: TokenData = Depends(require_doctor_chef)
+):
     """Inicia o servidor de uma instituição existente. Exclusivo para doctor-chef."""
-    tenants = discover_tenants()
+    base_url = get_request_base_url(request)
+    tenants = discover_tenants(base_url=base_url)
     tenant = next((t for t in tenants if t["slug"] == slug), None)
     if not tenant:
         raise HTTPException(status_code=404, detail="Instituição não encontrada.")
@@ -2368,9 +2423,14 @@ def start_platform_tenant(slug: str, current_user: TokenData = Depends(require_d
 
 
 @router.post("/platform/tenants/{slug}/stop")
-def stop_platform_tenant(slug: str, current_user: TokenData = Depends(require_doctor_chef)):
+def stop_platform_tenant(
+    slug: str,
+    request: Request = None,
+    current_user: TokenData = Depends(require_doctor_chef)
+):
     """Para o servidor de uma instituição existente. Exclusivo para doctor-chef."""
-    tenants = discover_tenants()
+    base_url = get_request_base_url(request)
+    tenants = discover_tenants(base_url=base_url)
     tenant = next((t for t in tenants if t["slug"] == slug), None)
     if not tenant:
         raise HTTPException(status_code=404, detail="Instituição não encontrada.")
@@ -2384,9 +2444,14 @@ def stop_platform_tenant(slug: str, current_user: TokenData = Depends(require_do
 
 
 @router.get("/platform/tenants/{slug}", response_model=TenantDetailResponse)
-def get_platform_tenant_detail(slug: str, current_user: TokenData = Depends(require_doctor_chef)):
+def get_platform_tenant_detail(
+    slug: str,
+    request: Request = None,
+    current_user: TokenData = Depends(require_doctor_chef)
+):
     """Retorna detalhes aprofundados de uma instituição e de seu master-chef. Exclusivo para doctor-chef."""
-    tenants = discover_tenants()
+    base_url = get_request_base_url(request)
+    tenants = discover_tenants(base_url=base_url)
     tenant = next((t for t in tenants if t["slug"] == slug), None)
     if not tenant:
         raise HTTPException(status_code=404, detail=f"Instituição '{slug}' não encontrada.")
@@ -2410,17 +2475,19 @@ def get_platform_tenant_detail(slug: str, current_user: TokenData = Depends(requ
 def update_platform_tenant(
     slug: str,
     payload: TenantUpdateRequest,
+    request: Request = None,
     current_user: TokenData = Depends(require_doctor_chef)
 ):
     """Atualiza metadados cadastrais da instituição e e-mail do master-chef. Exclusivo para doctor-chef."""
-    tenants = discover_tenants()
+    base_url = get_request_base_url(request)
+    tenants = discover_tenants(base_url=base_url)
     tenant = next((t for t in tenants if t["slug"] == slug), None)
     if not tenant:
         raise HTTPException(status_code=404, detail=f"Instituição '{slug}' não encontrada.")
 
     _update_tenant_metadata(slug, new_name=payload.name, new_email=payload.master_chef_email)
 
-    updated_tenants = discover_tenants()
+    updated_tenants = discover_tenants(base_url=base_url)
     updated_tenant = next((t for t in updated_tenants if t["slug"] == slug), tenant)
     updated_master_chef = _get_tenant_master_chef_info(slug)
 

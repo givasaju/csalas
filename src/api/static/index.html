@@ -2000,10 +2000,23 @@
           return;
         }
 
+        function resolveTenantUrl(url) {
+          if (!url) return window.location.origin + "/";
+          if (url.includes("localhost") || url.includes("127.0.0.1")) {
+            if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+              return window.location.origin + "/";
+            }
+          }
+          return url;
+        }
+
         if (tbody) {
           tbody.innerHTML = data.tenants.map(t => {
-            const statusClass = t.status === "online" ? "tenant-status-online" : "tenant-status-offline";
-            const statusIcon = t.status === "online" ? "🟢" : "⚪";
+            const tenantUrl = resolveTenantUrl(t.url);
+            const isOnline = t.status === "online" || (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1");
+            const statusClass = isOnline ? "tenant-status-online" : "tenant-status-offline";
+            const statusIcon = isOnline ? "🟢" : "⚪";
+            const statusText = isOnline ? "ONLINE" : "OFFLINE";
             return `
               <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                 <td style="padding: 0.85rem 1rem; font-weight: 600; color: #fff;">${escapeHtml(t.name)}</td>
@@ -2011,18 +2024,18 @@
                 <td style="padding: 0.85rem 1rem; font-weight: 700; color: #34d399;">${t.port}</td>
                 <td style="padding: 0.85rem 1rem;">
                   <span class="tenant-status-badge ${statusClass}">
-                    ${statusIcon} ${t.status.toUpperCase()}
+                    ${statusIcon} ${statusText}
                   </span>
                 </td>
                 <td style="padding: 0.85rem 1rem;">
-                  <a href="${t.url}" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: none; font-family: monospace; font-size: 0.85rem;">
-                    ${escapeHtml(t.url)} ↗
+                  <a href="${tenantUrl}" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: none; font-family: monospace; font-size: 0.85rem;">
+                    ${escapeHtml(tenantUrl)} ↗
                   </a>
                 </td>
                 <td style="padding: 0.85rem 1rem; white-space: nowrap;">
                   <div style="display: inline-flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
-                    ${t.status === "online"
-                      ? `<a href="${t.url}" target="_blank" rel="noopener noreferrer" class="btn-quick-action" style="text-decoration: none; padding: 0.35rem 0.6rem; font-size: 0.78rem; border-color: rgba(96, 165, 250, 0.4); color: #60a5fa;" title="Abrir portal do tenant">🔗 Acessar</a>
+                    ${isOnline
+                      ? `<a href="${tenantUrl}" target="_blank" rel="noopener noreferrer" class="btn-quick-action" style="text-decoration: none; padding: 0.35rem 0.6rem; font-size: 0.78rem; border-color: rgba(96, 165, 250, 0.4); color: #60a5fa;" title="Abrir portal do tenant">🔗 Acessar</a>
                          <button type="button" class="btn-quick-action" onclick="toggleTenantServer('${escapeHtml(t.slug)}', 'stop')" style="padding: 0.35rem 0.6rem; font-size: 0.78rem; border-color: rgba(239, 68, 68, 0.4); color: #f87171;" title="Parar servidor desta instituição">⏹️ Parar</button>`
                       : `<button type="button" class="btn-quick-action" onclick="toggleTenantServer('${escapeHtml(t.slug)}', 'start')" style="padding: 0.35rem 0.6rem; font-size: 0.78rem; border-color: rgba(52, 211, 153, 0.4); color: #34d399;" title="Iniciar servidor desta instituição">▶️ Iniciar</button>`
                     }
@@ -2077,11 +2090,18 @@
 
         const data = await res.json();
         if (res.status === 202) {
+          const dedicatedUrl = (function(url) {
+            if (!url) return window.location.origin + "/";
+            if ((url.includes("localhost") || url.includes("127.0.0.1")) && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+              return window.location.origin + "/";
+            }
+            return url;
+          })(data.tenant.url);
           alertBox.className = "auth-alert auth-alert-success";
           alertBox.style.display = "block";
           alertBox.innerHTML = `
             <strong>Sucesso!</strong> Instituição <code>${escapeHtml(slug)}</code> aceita para provisionamento.<br>
-            URL Dedicada: <a href="${data.tenant.url}" target="_blank" style="color: #34d399; font-weight: 700;">${data.tenant.url}</a><br>
+            URL Dedicada: <a href="${dedicatedUrl}" target="_blank" style="color: #34d399; font-weight: 700;">${dedicatedUrl}</a><br>
             Master-Chef: <code>${escapeHtml(master_chef_email)}</code> (login com redefinição obrigatória de senha).
           `;
           showToast(`Instituição ${name} provisionada com sucesso!`, "success");
