@@ -152,14 +152,56 @@ def seed_users():
     finally:
         db.close()
 
+from typing import Optional, Dict, Any
+from fastapi import Header
+
 seed_subslots()
 seed_users()
 
-def get_db():
+_tenant_engines: Dict[str, Any] = {}
+_tenant_session_factories: Dict[str, Any] = {}
+
+
+def get_tenant_session(slug: Optional[str]):
+    """Retorna uma sessão SQLAlchemy conectada à base isolada da instituição data/{slug}/project.db."""
+    if not slug:
+        return None
+    slug = slug.strip().lower()
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    data_dir = os.path.join(root_dir, 'data', slug)
+    db_file = None
+    for cand in ["project.db", "classsync.db"]:
+        p = os.path.join(data_dir, cand)
+        if os.path.exists(p):
+            db_file = p
+            break
+    if not db_file:
+        return None
+
+    if slug not in _tenant_engines:
+        db_url = f"sqlite:///{os.path.abspath(db_file)}"
+        t_engine = create_engine(db_url, connect_args={"check_same_thread": False})
+        _tenant_engines[slug] = t_engine
+        _tenant_session_factories[slug] = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=t_engine))
+
+    return _tenant_session_factories[slug]()
+
+
+def get_db(x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug")):
+    if isinstance(x_tenant_slug, str) and x_tenant_slug.strip():
+        t_session = get_tenant_session(x_tenant_slug.strip())
+        if t_session:
+            try:
+                yield t_session
+            finally:
+                t_session.close()
+            return
+
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
 
 

@@ -417,3 +417,113 @@ def test_tenant_start_stop_endpoints_and_status(monkeypatch):
         assert stop_res.json()["status"] == "offline"
 
 
+def test_resolve_tenant_url_cloud_and_local():
+    from src.api.routes import resolve_tenant_url
+    cloud_url = "https://classsync-api-762128600754.southamerica-east1.run.app"
+    slug = "instituto_federal_de_sergipe"
+
+    # Cloud com slug
+    resolved_cloud = resolve_tenant_url(port=8001, base_url=cloud_url, slug=slug)
+    assert resolved_cloud == f"{cloud_url}/?tenant={slug}"
+
+    # Cloud sem slug
+    resolved_no_slug = resolve_tenant_url(port=8001, base_url=cloud_url, slug=None)
+    assert resolved_no_slug == f"{cloud_url}/"
+
+    # Local sem base_url
+    resolved_local = resolve_tenant_url(port=8005, base_url=None, slug=slug)
+    assert resolved_local == "http://localhost:8005/"
+
+
+def test_tenant_info_public_endpoint():
+    # Provisionar tenant para teste
+    import uuid
+    token = get_token_for("doctor@classsync.ai", "Doctor@2026")
+    headers = {"Authorization": f"Bearer {token}"}
+    info_slug = f"f_info_{uuid.uuid4().hex[:6]}"
+
+    # Obter próxima porta livre
+    tenants_res = client.get("/api/v1/platform/tenants", headers=headers)
+    free_port = tenants_res.json().get("next_available_port", 8150)
+
+    res = client.post("/api/v1/platform/tenants", json={
+        "name": "Faculdade Info Teste",
+        "slug": info_slug,
+        "port": free_port,
+        "master_chef_email": f"diretor@{info_slug}.edu.br",
+        "master_chef_password": "SenhaInfo@2026"
+    }, headers=headers)
+    assert res.status_code == 202
+
+    try:
+        # Endpoint público GET /api/v1/tenant/info?slug=...
+        info_res = client.get(f"/api/v1/tenant/info?slug={info_slug}")
+        assert info_res.status_code == 200
+        data = info_res.json()
+        assert data["slug"] == info_slug
+        assert data["name"] == "Faculdade Info Teste"
+        assert data["status"] == "online"
+
+        # Tenant inexistente
+        not_found = client.get("/api/v1/tenant/info?slug=inexistente_total")
+        assert not_found.status_code == 404
+    finally:
+        # Limpeza
+        client.request("DELETE", f"/api/v1/platform/tenants/{info_slug}", json={"confirm_slug": info_slug}, headers=headers)
+
+
+def test_tenant_login_with_context_header_and_payload():
+    import uuid
+    token = get_token_for("doctor@classsync.ai", "Doctor@2026")
+    headers = {"Authorization": f"Bearer {token}"}
+    auth_slug = f"f_auth_{uuid.uuid4().hex[:6]}"
+
+    # Obter próxima porta livre
+    tenants_res = client.get("/api/v1/platform/tenants", headers=headers)
+    free_port = tenants_res.json().get("next_available_port", 8160)
+
+    res = client.post("/api/v1/platform/tenants", json={
+        "name": "Faculdade Auth Teste",
+        "slug": auth_slug,
+        "port": free_port,
+        "master_chef_email": f"reitor@{auth_slug}.edu.br",
+        "master_chef_password": "SenhaReitor@2026"
+    }, headers=headers)
+    assert res.status_code == 202
+
+    try:
+        # 1. Login no banco central sem X-Tenant-Slug deve falhar (reitor só existe no banco do tenant)
+        res_fail = client.post("/api/v1/auth/login", json={
+            "email": f"reitor@{auth_slug}.edu.br",
+            "password": "SenhaReitor@2026"
+        })
+        assert res_fail.status_code == 401
+
+        # 2. Login com cabeçalho X-Tenant-Slug deve autenticar no banco do tenant
+        res_header = client.post(
+            "/api/v1/auth/login",
+            json={"email": f"reitor@{auth_slug}.edu.br", "password": "SenhaReitor@2026"},
+            headers={"X-Tenant-Slug": auth_slug}
+        )
+        assert res_header.status_code == 200
+        body = res_header.json()
+        assert "access_token" in body
+        assert body["user"]["email"] == f"reitor@{auth_slug}.edu.br"
+        assert body["user"]["role"] == "gestor"
+        assert body["user"]["must_change_password"] is True
+
+        # 3. Login com payload contendo tenant_slug
+        res_payload = client.post(
+            "/api/v1/auth/login",
+            json={"email": f"reitor@{auth_slug}.edu.br", "password": "SenhaReitor@2026", "tenant_slug": auth_slug}
+        )
+        assert res_payload.status_code == 200
+        body2 = res_payload.json()
+        assert "access_token" in body2
+        assert body2["user"]["email"] == f"reitor@{auth_slug}.edu.br"
+    finally:
+        # Limpeza
+        client.request("DELETE", f"/api/v1/platform/tenants/{auth_slug}", json={"confirm_slug": auth_slug}, headers=headers)
+
+
+

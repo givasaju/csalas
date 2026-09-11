@@ -23,7 +23,8 @@ from src.api.schemas import (
     TenantCreateRequest, TenantResponse, TenantListResponse,
     MasterChefInfo, TenantDetailResponse, TenantUpdateRequest,
     MasterChefResetRequest, MasterChefResetResponse,
-    TenantDeleteRequest, TenantDeleteResponse
+    TenantDeleteRequest, TenantDeleteResponse,
+    TenantInfoResponse
 )
 from src.api.auth import (
     hash_password, verify_password, create_access_token,
@@ -31,7 +32,7 @@ from src.api.auth import (
 )
 
 from src.api.allocation_validator import check_consecutive_limit
-from src.database import get_db
+from src.database import get_db, get_tenant_session
 
 from src import models
 from src.api.worker import db_tasks, enqueue_allocation_run, save_emergency_reallocation_log
@@ -1603,48 +1604,93 @@ def register_user(payload: UserRegisterRequest, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/auth/login")
-def login_user(payload: UserLoginRequest, db: Session = Depends(get_db)):
-    """Autenticação de usuário e emissão de token JWT."""
-    user = db.query(models.User).filter(models.User.email == payload.email.strip().lower()).first()
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="E-mail ou senha incorretos."
-        )
+@router.get("/tenant/info", response_model=TenantInfoResponse)
+def get_tenant_info(
+    slug: Optional[str] = None,
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug")
+):
+    """Retorna os metadados públicos de uma instituição para exibição na SPA."""
+    target_slug = slug or x_tenant_slug
+    if not target_slug:
+        raise HTTPException(status_code=400, detail="Identificador do tenant (slug) é obrigatório.")
 
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Conta aguarda aprovação pelo gestor da plataforma."
-        )
+    target_slug = target_slug.strip().lower()
+    tenants = discover_tenants()
+    tenant = next((t for t in tenants if t["slug"] == target_slug), None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail=f"Instituição '{target_slug}' não encontrada.")
 
-    must_change = bool(getattr(user, "must_change_password", False))
-    token_claims = {
-        "sub": user.email,
-        "id": user.id,
-        "name": user.name,
-        "role": user.role,
-        "department": user.department,
-        "must_change_password": must_change
-    }
-    token = create_access_token(token_claims)
-
-    logger.info(f"[AUTH] Login bem-sucedido: {user.email} (role={user.role})")
     return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {
+        "name": tenant["name"],
+        "slug": tenant["slug"],
+        "status": "online"
+    }
+
+
+@router.post("/auth/login")
+def login_user(
+    payload: UserLoginRequest,
+    x_tenant_slug: Optional[str] = Header(None, alias="X-Tenant-Slug"),
+    db: Session = Depends(get_db)
+):
+    """Autenticação de usuário e emissão de token JWT."""
+    effective_slug = (payload.tenant_slug or x_tenant_slug or "").strip().lower()
+    session_to_use = db
+    close_session_after = False
+
+    if payload.tenant_slug and not x_tenant_slug:
+        tenant_s = get_tenant_session(payload.tenant_slug)
+        if tenant_s:
+            session_to_use = tenant_s
+            close_session_after = True
+
+    try:
+        user = session_to_use.query(models.User).filter(models.User.email == payload.email.strip().lower()).first()
+        if not user or not verify_password(payload.password, user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="E-mail ou senha incorretos."
+            )
+
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Conta aguarda aprovação pelo gestor da plataforma."
+            )
+
+        must_change = bool(getattr(user, "must_change_password", False))
+        token_claims = {
+            "sub": user.email,
             "id": user.id,
             "name": user.name,
-            "email": user.email,
             "role": user.role,
             "department": user.department,
-            "is_active": user.is_active,
-            "must_change_password": must_change,
-            "created_at": user.created_at.isoformat() if user.created_at else None
+            "must_change_password": must_change
         }
-    }
+        if effective_slug:
+            token_claims["tenant"] = effective_slug
+
+        token = create_access_token(token_claims)
+
+        logger.info(f"[AUTH] Login bem-sucedido: {user.email} (role={user.role}, tenant={effective_slug or 'default'})")
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "role": user.role,
+                "department": user.department,
+                "is_active": user.is_active,
+                "must_change_password": must_change,
+                "tenant": effective_slug if effective_slug else None,
+                "created_at": user.created_at.isoformat() if user.created_at else None
+            }
+        }
+    finally:
+        if close_session_after:
+            session_to_use.close()
 
 
 @router.get("/auth/me")
@@ -1789,14 +1835,16 @@ def is_cloud_environment(base_url: Optional[str] = None) -> bool:
 def resolve_tenant_url(port: int, base_url: Optional[str] = None, slug: Optional[str] = None) -> str:
     """
     Retorna a URL dedicada da instituição/tenant.
-    Em ambiente de nuvem (como Cloud Run), retorna a URL base pública.
+    Em ambiente de nuvem (como Cloud Run), retorna a URL base pública com parâmetro contextual ?tenant={slug}.
     Em desenvolvimento local, retorna http://localhost:{port}/.
     """
     if base_url:
-        return f"{base_url.rstrip('/')}/"
+        b = base_url.rstrip('/')
+        return f"{b}/?tenant={slug}" if slug else f"{b}/"
     env_base = os.environ.get("BASE_URL") or os.environ.get("APP_URL") or os.environ.get("PUBLIC_URL")
     if env_base:
-        return f"{env_base.strip().rstrip('/')}/"
+        b = env_base.strip().rstrip('/')
+        return f"{b}/?tenant={slug}" if slug else f"{b}/"
     return f"http://localhost:{port}/"
 
 

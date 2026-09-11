@@ -155,6 +155,13 @@ class UserRegisterRequest(BaseModel):
 class UserLoginRequest(BaseModel):
     email: str = Field(..., min_length=3, description="E-mail do usuário.")
     password: str = Field(..., min_length=1, description="Senha do usuário.")
+    tenant_slug: Optional[str] = Field(None, description="Slug opcional da instituição para autenticação contextual.")
+
+
+class TenantInfoResponse(BaseModel):
+    name: str
+    slug: str
+    status: str = "online"
 
 
 class UserResponse(BaseModel):

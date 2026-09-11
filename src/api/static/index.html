@@ -1542,8 +1542,35 @@
 
   <script>
     const mockToken = "Bearer mock-token";
+
+    // Detecção e Isolamento de Contexto de Tenant via URL (?tenant=slug)
+    const urlParams = new URLSearchParams(window.location.search);
+    const tenantParam = urlParams.get("tenant");
+    let currentTenantSlug = tenantParam ? tenantParam.trim().toLowerCase() : (localStorage.getItem("classsync_tenant") || null);
+    if (tenantParam) {
+      localStorage.setItem("classsync_tenant", currentTenantSlug);
+    }
+
     let currentToken = localStorage.getItem("classsync_token") || null;
     let currentUser = null;
+
+    // Isolamento estrito entre abas da SPA:
+    // Se esta aba está em contexto de tenant e o usuário local for doctor-chef ou de outro tenant,
+    // encerra imediatamente a sessão desta aba para abrir o portal de login institucional
+    if (currentTenantSlug) {
+      try {
+        const cachedUserStr = localStorage.getItem("classsync_user");
+        if (cachedUserStr) {
+          const cachedUser = JSON.parse(cachedUserStr);
+          if (cachedUser && (cachedUser.role === "doctor-chef" || (cachedUser.tenant && cachedUser.tenant !== currentTenantSlug))) {
+            localStorage.removeItem("classsync_token");
+            localStorage.removeItem("classsync_user");
+            currentToken = null;
+            currentUser = null;
+          }
+        }
+      } catch (e) {}
+    }
 
     let activeTaskId = null;
     let pollInterval = null;
@@ -1564,7 +1591,43 @@
       } else {
         headers["Authorization"] = mockToken;
       }
+      if (currentTenantSlug) {
+        headers["X-Tenant-Slug"] = currentTenantSlug;
+      }
       return headers;
+    }
+
+    async function initTenantContext() {
+      if (!currentTenantSlug) return;
+
+      // Ocultar terminantemente a aba de Administração Geral
+      const tabPlatformTenants = document.getElementById("tabBtnPlatformTenants");
+      if (tabPlatformTenants) tabPlatformTenants.style.display = "none";
+
+      try {
+        const res = await fetch(`/api/v1/tenant/info?slug=${encodeURIComponent(currentTenantSlug)}`, {
+          headers: getAuthHeaders(false)
+        });
+        if (res.ok) {
+          const info = await res.json();
+          const modalTitle = document.querySelector("#loginModal .auth-modal-header h3");
+          const modalSubtitle = document.querySelector("#loginModal .auth-modal-header p");
+          const heroTitle = document.querySelector(".hero-title");
+          const heroSubtitle = document.querySelector(".hero-subtitle");
+          const heroBadge = document.querySelector(".hero-badge");
+          const logoSubtitle = document.querySelector(".landing-logo span:last-child");
+
+          if (modalTitle) modalTitle.innerHTML = `🏛️ ${info.name}`;
+          if (modalSubtitle) modalSubtitle.textContent = `Acesso ao Portal Acadêmico Institucional (${info.slug})`;
+          if (heroBadge) heroBadge.innerHTML = `<span>🏛️</span> Instância Dedicada: <strong>${info.name}</strong>`;
+          if (heroTitle) heroTitle.innerHTML = `Portal de Gestão de Salas & Horários<br><span style="color: #a5b4fc; font-size: 1.8rem; font-weight: 600;">${info.name}</span>`;
+          if (heroSubtitle) heroSubtitle.textContent = `Ambiente autônomo e isolado da ${info.name}. Alocação inteligente de horários, salas físicas e resolução automática de restrições docentes.`;
+          if (logoSubtitle) logoSubtitle.textContent = info.name;
+          document.title = `ClassSync AI — ${info.name}`;
+        }
+      } catch (err) {
+        console.warn("[TenantContext] Não foi possível carregar metadados do tenant:", err);
+      }
     }
 
     function openLoginModal() {
@@ -1615,16 +1678,29 @@
       alertBox.style.display = "none";
 
       try {
+        const payload = { email, password };
+        if (currentTenantSlug) {
+          payload.tenant_slug = currentTenantSlug;
+        }
+
+        const headers = { "Content-Type": "application/json" };
+        if (currentTenantSlug) {
+          headers["X-Tenant-Slug"] = currentTenantSlug;
+        }
+
         const res = await fetch("/api/v1/auth/login", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password })
+          headers: headers,
+          body: JSON.stringify(payload)
         });
 
         const data = await res.json();
         if (res.ok) {
           currentToken = data.access_token;
           currentUser = data.user;
+          if (currentTenantSlug) {
+            currentUser.tenant = currentTenantSlug;
+          }
           localStorage.setItem("classsync_token", currentToken);
           localStorage.setItem("classsync_user", JSON.stringify(currentUser));
           closeLoginModal();
@@ -2000,11 +2076,16 @@
           return;
         }
 
-        function resolveTenantUrl(url) {
-          if (!url) return window.location.origin + "/";
+        function resolveTenantUrl(url, slug) {
+          if (url && url.includes("?tenant=")) return url;
+          const isNotLocal = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
+          if (slug && isNotLocal) {
+            return `${window.location.origin}/?tenant=${encodeURIComponent(slug)}`;
+          }
+          if (!url) return `${window.location.origin}/?tenant=${encodeURIComponent(slug || '')}`;
           if (url.includes("localhost") || url.includes("127.0.0.1")) {
-            if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-              return window.location.origin + "/";
+            if (isNotLocal) {
+              return `${window.location.origin}/?tenant=${encodeURIComponent(slug || '')}`;
             }
           }
           return url;
@@ -2012,7 +2093,7 @@
 
         if (tbody) {
           tbody.innerHTML = data.tenants.map(t => {
-            const tenantUrl = resolveTenantUrl(t.url);
+            const tenantUrl = resolveTenantUrl(t.url, t.slug);
             const isOnline = t.status === "online" || (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1");
             const statusClass = isOnline ? "tenant-status-online" : "tenant-status-offline";
             const statusIcon = isOnline ? "🟢" : "⚪";
@@ -5685,6 +5766,7 @@
       gridContainer.innerHTML = res.html;
       if (countEl) countEl.textContent = `${res.totalClasses} aula(s) semanal(is)`;
     }
+    initTenantContext();
     checkAuthSession();
     updateAllocSubSlotOptions();
     setTimeout(() => {
