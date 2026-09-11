@@ -1,7 +1,12 @@
-# Byte-compiled / otimização do Python
+# ==============================================================================
+# ClassSync AI - .gitignore para Produção / Google Cloud
+# ==============================================================================
+
+# Bytecode e caches Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
 
 # Ambientes virtuais
 .venv/
@@ -9,7 +14,7 @@ venv/
 ENV/
 env/
 
-# Testes e cobertura de código
+# Testes e cobertura
 .pytest_cache/
 .coverage
 .coverage.*
@@ -18,29 +23,44 @@ coverage.xml
 *.cover
 .hypothesis/
 
-# Variáveis de ambiente e segredos
+# Variáveis de ambiente e arquivos de credenciais/anotações
 .env
 .env.*
 !.env.example
+super-user.txt
+github.txt
 
-# Bancos de dados locais / runtime
+# Bancos de dados e volumes de dados locais (usar Cloud SQL / GCS em nuvem)
+data/
 db/*.db
 *.sqlite
 *.sqlite3
 
-# Arquivos de IDEs e editores
+# Logs
+*.log
+logs/
+
+# Editores, IDEs e agentes de IA
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.antigravity/
-
-# Sistema operacional
 .DS_Store
 Thumbs.db
 ehthumbs.db
+.agents/
+.antigravity/
+.claude/
 
-# Logs
-*.log
-logs/
+# Artefatos do Framework Reversa (não necessários em produção/deploy)
+.reversa/
+_reversa_sdd/
+_reversa_docs/
+_reversa_forward/
+_reversa_bugs/
+_reversa_refactor/
+
+# Pastas clonadas ou temporárias
+csalas/
+

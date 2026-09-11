@@ -1,7 +1,0 @@
-{"ts":"2026-08-09T12:02:15Z","action":"T001","status":"done","files":["src/models.py","src/api/schemas.py"]}
-{"ts":"2026-08-09T12:02:30Z","action":"T002","status":"done","files":["tests/test_api_teacher_subjects.py"]}
-{"ts":"2026-08-09T12:02:50Z","action":"T003","status":"done","files":["src/api/routes.py"]}
-{"ts":"2026-08-09T12:02:55Z","action":"T004","status":"done","files":["src/api/worker.py"]}
-{"ts":"2026-08-09T12:04:40Z","action":"T005","status":"done","files":["src/api/static/index.html"]}
-{"ts":"2026-08-09T12:04:45Z","action":"T006","status":"done","files":["src/api/static/index.css"]}
-{"ts":"2026-08-09T12:05:00Z","action":"T007","status":"done","files":["src/api/routes.py"]}

@@ -1,7 +1,0 @@
-{"ts":"2026-08-10T16:17:15Z","action":"T001","status":"done","files":["src/api/schemas.py"]}
-{"ts":"2026-08-10T16:17:22Z","action":"T002","status":"done","files":["tests/test_api_reallocate_subjects.py"]}
-{"ts":"2026-08-10T16:17:50Z","action":"T003","status":"done","files":["src/api/routes.py"]}
-{"ts":"2026-08-10T16:17:50Z","action":"T004","status":"done","files":["src/api/routes.py"]}
-{"ts":"2026-08-10T16:19:35Z","action":"T005","status":"done","files":["src/api/static/index.html"]}
-{"ts":"2026-08-10T16:19:45Z","action":"T006","status":"done","files":["src/api/static/index.html"]}
-{"ts":"2026-08-10T16:19:55Z","action":"T007","status":"done","files":["tests/test_api_reallocate_subjects.py"]}

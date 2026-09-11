@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 1,
-  "generatedAt": "2026-08-07T18:34:41-03:00",
-  "treemap_loc_by_folder": [],
-  "top_complexity": [],
-  "loc_histogram": {"bins": [], "counts": []},
-  "dependency_sankey": {"nodes": [], "links": []},
-  "language_distribution": []
-}
